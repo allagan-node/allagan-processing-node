@@ -7,7 +7,7 @@ const Index = props => {
     <div>
       <Result
         icon={<img src="/static/28642.png" style={{ borderRadius: "50%" }} />}
-        subTitle="알라그 가공 시스템은 파이널 판타지 14 클라이언트 자료 가공에 쓰이는 여러 도구를 제공합니다. 아래 도구 중 사용할 도구를 선택해주세요."
+        subTitle="알라그 가공 시스템은 파이널 판타지 14 클라이언트 자료 가공에 쓰이는 여러 도구를 제공합니다. 아래 목록에서 사용할 도구를 선택해주세요."
         title="알라그 가공 시스템"
       />
       <Row justify="center" style={{ marginTop: "25px" }} type="flex">
