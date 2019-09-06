@@ -15,7 +15,7 @@ const Index = props => {
           <Card hoverable onClick={() => Router.push("/editor")}>
             <Card.Meta
               avatar={<Avatar icon="edit" />}
-              description="편집 도구를 사용해 자료 내 문자열 편집이 가능합니다."
+              description="편집 도구를 사용해 자료 편집이 가능합니다."
               title="편집 도구"
             />
           </Card>
