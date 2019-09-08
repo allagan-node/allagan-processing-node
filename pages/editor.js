@@ -1,4 +1,4 @@
-import { Card, Col, Row, Steps } from "antd";
+import { Card, Steps } from "antd";
 import React from "react";
 
 import DataEditor from "../src/components/editor/data-editor";
@@ -9,11 +9,7 @@ const Editor = props => {
   const incrementCurrent = () => {
     setCurrent(current + 1);
   };
-
-  let files = {
-    indexFile: null,
-    datFiles: []
-  };
+  const [files, setFiles] = React.useState({});
 
   return (
     <Card style={{ margin: "25px 25px 0 25px" }}>
@@ -23,9 +19,9 @@ const Editor = props => {
         <Steps.Step title="자료 재구축" />
       </Steps>
       {current === 0 && (
-        <DataSelector incrementCurrent={incrementCurrent} files={files} />
+        <DataSelector incrementCurrent={incrementCurrent} setFiles={setFiles} />
       )}
-      {current === 1 && <DataEditor />}
+      {current === 1 && <DataEditor files={files} />}
     </Card>
   );
 };
