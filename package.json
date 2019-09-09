@@ -4,10 +4,9 @@
   "description": "allagan-processing-node",
   "private": true,
   "scripts": {
-    "format": "prettier --write .babelrc next.config.js pages/**/*.js src/**/*.js",
+    "format": "prettier --write pages/**/*.js src/**/*.js",
     "develop": "next",
     "build": "next build",
-    "start": "next start",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

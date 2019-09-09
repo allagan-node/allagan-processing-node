@@ -1,6 +1,8 @@
 import { Alert, Button, Icon, Progress, Result, Upload } from "antd";
 import React from "react";
 
+import { ReadFromFile } from "../../utility";
+
 const DataSelector = props => {
   const [errors, setErrors] = React.useState([]);
   const [pass, setPass] = React.useState(false);
@@ -53,7 +55,7 @@ const DataSelector = props => {
               setLoadingText("");
               setLoading(true);
 
-              return new Promise(async (resolve, reject) => {
+              return new Promise(resolve => {
                 let _errors = [];
 
                 let indexFiles = fileList.filter(f => {
@@ -74,14 +76,11 @@ const DataSelector = props => {
                   setProgress(Math.round(((i + 1) / indexFiles.length) * 100));
                   setLoadingText("검사 중... " + indexFiles[i].name);
 
-                  let fr = new FileReader();
-                  fr.onload = e => {
-                    let b = e.target.result;
-                    let dv = new DataView(b);
-                    let headerOffset = dv.getInt32(0xc, true);
-                    let numDat = dv.getUint8(headerOffset + 0x50);
-
-                    let fileName = indexFiles[i].name.substring(
+                  ReadFromFile(indexFiles[i]).then(b => {
+                    const dv = new DataView(b);
+                    const headerOffset = dv.getInt32(0xc, true);
+                    const numDat = dv.getUint8(headerOffset + 0x50, true);
+                    const fileName = indexFiles[i].name.substring(
                       0,
                       indexFiles[i].name.indexOf(".")
                     );
@@ -90,7 +89,7 @@ const DataSelector = props => {
                     };
 
                     for (let j = 0; j < numDat; j++) {
-                      let datFile = fileList.find(f => {
+                      const datFile = fileList.find(f => {
                         return (
                           f.name.substring(0, f.name.indexOf(".")) ===
                             fileName &&
@@ -122,8 +121,7 @@ const DataSelector = props => {
                       setErrors(_errors);
                       setLoading(false);
                     }
-                  };
-                  fr.readAsArrayBuffer(indexFiles[i]);
+                  });
                 };
 
                 diagnose(0);

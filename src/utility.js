@@ -274,9 +274,19 @@ export const Compute = str => {
 };
 
 export const GetBytes = str => {
-  let bytes = [];
+  const bytes = [];
   for (let i = 0; i < str.length; i++) {
     bytes.push(str.charCodeAt(i));
   }
   return bytes;
+};
+
+export const ReadFromFile = f => {
+  return new Promise(resolve => {
+    const fr = new FileReader();
+    fr.onload = e => {
+      resolve(e.target.result);
+    };
+    fr.readAsArrayBuffer(f);
+  });
 };
