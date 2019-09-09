@@ -1,10 +1,12 @@
-import { Alert, Button, Icon, Result, Spin, Upload } from "antd";
+import { Alert, Button, Icon, Progress, Result, Upload } from "antd";
 import React from "react";
 
 const DataSelector = props => {
   const [errors, setErrors] = React.useState([]);
   const [pass, setPass] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+  const [progress, setProgress] = React.useState(0);
+  const [loadingText, setLoadingText] = React.useState("");
 
   return (
     <React.Fragment>
@@ -40,50 +42,54 @@ const DataSelector = props => {
             subTitle="다음 단계로 넘어가 자료 편집을 시작하세요!"
           />
         ) : (
-          <Spin indicator={<Icon type="loading" />} spinning={loading}>
-            <Upload.Dragger
-              accept=".index*,.dat*"
-              beforeUpload={(file, fileList) => {
-                const files = {};
+          <Upload.Dragger
+            accept=".index*,.dat*"
+            beforeUpload={(file, fileList) => {
+              const files = {};
 
-                setErrors([]);
-                setPass(false);
-                setLoading(true);
+              setErrors([]);
+              setPass(false);
+              setProgress(0);
+              setLoadingText("");
+              setLoading(true);
 
-                return new Promise(async (resolve, reject) => {
-                  let _errors = [];
+              return new Promise(async (resolve, reject) => {
+                let _errors = [];
 
-                  let indexFiles = fileList.filter(f => {
-                    return (
-                      f.name.substring(
-                        f.name.lastIndexOf("."),
-                        f.name.length
-                      ) === ".index"
-                    );
-                  });
+                let indexFiles = fileList.filter(f => {
+                  return (
+                    f.name.substring(f.name.lastIndexOf("."), f.name.length) ===
+                    ".index"
+                  );
+                });
 
-                  if (indexFiles.length === 0) {
-                    _errors.push("index 파일을 찾지 못했습니다.");
-                    setErrors(_errors);
-                    setLoading(false);
-                    resolve();
-                  }
+                if (indexFiles.length === 0) {
+                  _errors.push("index 파일을 찾지 못했습니다.");
+                  setErrors(_errors);
+                  setLoading(false);
+                  resolve();
+                }
 
-                  for (const indexFile of indexFiles) {
-                    let b = await indexFile.arrayBuffer();
+                const diagnose = i => {
+                  setProgress(Math.round(((i + 1) / indexFiles.length) * 100));
+                  setLoadingText("검사 중... " + indexFiles[i].name);
+
+                  let fr = new FileReader();
+                  fr.onload = e => {
+                    let b = e.target.result;
                     let dv = new DataView(b);
                     let headerOffset = dv.getInt32(0xc, true);
                     let numDat = dv.getUint8(headerOffset + 0x50);
 
-                    let fileName = indexFile.name.substring(
+                    let fileName = indexFiles[i].name.substring(
                       0,
-                      indexFile.name.indexOf(".")
+                      indexFiles[i].name.indexOf(".")
                     );
                     files[fileName] = {
-                      index: indexFile
+                      index: indexFiles[i]
                     };
 
-                    for (let i = 0; i < numDat; i++) {
+                    for (let j = 0; j < numDat; j++) {
                       let datFile = fileList.find(f => {
                         return (
                           f.name.substring(0, f.name.indexOf(".")) ===
@@ -92,47 +98,66 @@ const DataSelector = props => {
                             f.name.lastIndexOf("."),
                             f.name.length
                           ) ===
-                            ".dat" + i
+                            ".dat" + j
                         );
                       });
 
                       if (!datFile) {
                         _errors.push(
-                          fileName + ": .dat" + i + " 파일을 찾지 못했습니다."
+                          fileName + ": .dat" + j + " 파일을 찾지 못했습니다."
                         );
                       } else {
-                        files[fileName][i] = datFile;
+                        files[fileName][j] = datFile;
                       }
                     }
-                  }
 
-                  if (_errors.length === 0) {
-                    props.setFiles(files);
-                    setPass(true);
-                  }
-                  setErrors(_errors);
-                  setLoading(false);
-                  resolve();
-                });
-              }}
-              customRequest={() => {}}
-              disabled={loading}
-              directory={true}
-              showUploadList={false}
-            >
-              <p className="ant-upload-drag-icon">
-                <Icon type="inbox" />
-              </p>
-              <p className="ant-upload-text">
-                여기를 클릭하거나 자료가 담긴 폴더를 이 곳으로 드래그하여
-                선택하세요.
-              </p>
-              <p className="ant-upload-hint">
-                파이널 판타지 14 클라이언트 자료는 일반적으로 /game/sqpack 하위
-                경로에 담겨져 있습니다.
-              </p>
-            </Upload.Dragger>
-          </Spin>
+                    i++;
+                    if (i < indexFiles.length) {
+                      diagnose(i);
+                    } else {
+                      if (_errors.length === 0) {
+                        props.setFiles(files);
+                        setPass(true);
+                      }
+                      setErrors(_errors);
+                      setLoading(false);
+                    }
+                  };
+                  fr.readAsArrayBuffer(indexFiles[i]);
+                };
+
+                diagnose(0);
+                resolve();
+              });
+            }}
+            customRequest={() => {}}
+            disabled={loading}
+            directory={true}
+            showUploadList={false}
+          >
+            {loading ? (
+              <React.Fragment>
+                <div className="ant-upload-drag-icon">
+                  <Progress type="circle" percent={progress} />
+                </div>
+                <p className="ant-upload-text">{loadingText}</p>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <p className="ant-upload-drag-icon">
+                  <Icon type="inbox" />
+                </p>
+                <p className="ant-upload-text">
+                  여기를 클릭하거나 자료가 담긴 폴더를 이 곳으로 드래그하여
+                  선택하세요.
+                </p>
+                <p className="ant-upload-hint">
+                  파이널 판타지 14 클라이언트 자료는 일반적으로 /game/sqpack
+                  하위 경로에 담겨져 있습니다. sqpack 폴더를 선택해주세요.
+                </p>
+              </React.Fragment>
+            )}
+          </Upload.Dragger>
         )}
       </div>
       <div style={{ marginTop: "25px" }}>

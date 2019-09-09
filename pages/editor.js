@@ -9,6 +9,9 @@ const Editor = props => {
   const incrementCurrent = () => {
     setCurrent(current + 1);
   };
+  const decrementCurrent = () => {
+    setCurrent(current - 1);
+  };
   const [files, setFiles] = React.useState({});
 
   return (
@@ -21,7 +24,13 @@ const Editor = props => {
       {current === 0 && (
         <DataSelector incrementCurrent={incrementCurrent} setFiles={setFiles} />
       )}
-      {current === 1 && <DataEditor files={files} />}
+      {current === 1 && (
+        <DataEditor
+          decrementCurrent={decrementCurrent}
+          files={files}
+          incrementCurrent={incrementCurrent}
+        />
+      )}
     </Card>
   );
 };

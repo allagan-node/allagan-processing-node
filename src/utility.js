@@ -267,10 +267,10 @@ export const Compute = str => {
       b = b + 0x20;
     }
 
-    hash = (hash >>> 8) ^ CrcTable[b ^ hash];
+    hash = (hash >>> 8) ^ CrcTable[0xff & (b ^ hash)];
   }
 
-  return hash;
+  return new Uint32Array([hash])[0];
 };
 
 export const GetBytes = str => {
