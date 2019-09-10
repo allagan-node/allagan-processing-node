@@ -1,11 +1,12 @@
-import { Col, Icon, message, Result, Row, Tree } from "antd";
+import { Col, Icon, message, Result, Row, Tabs, Tree } from "antd";
 import React, { useEffect } from "react";
 
 import {
   Compute,
-  ReadDataBlocks,
-  ReadFromFile,
-  UnwrapOffset
+  DecodeDataBlocks,
+  ReadBytesFromFile,
+  UnwrapOffset,
+  DecodeExH
 } from "../../utility";
 
 const DataEditor = props => {
@@ -29,7 +30,7 @@ const DataEditor = props => {
     const fileMap = {};
 
     setLoadingText("문자열 자료 인덱스 읽는 중...");
-    ReadFromFile(props.files["0a0000"].index)
+    ReadBytesFromFile(props.files["0a0000"].index)
       .then(b => {
         const dv = new DataView(b);
         const headerOffset = dv.getInt32(0xc, true);
@@ -67,17 +68,15 @@ const DataEditor = props => {
 
         const unwrappedOffset = UnwrapOffset(root.wrappedOffset);
 
-        setLoadingText("문자열 자료 ExL 읽는 중...");
-        return ReadFromFile(props.files["0a0000"][unwrappedOffset.datFileNum]);
-      })
-      .then(b => {
-        setLoadingText("문자열 자료 ExL 압축 해제 중...");
-        const root = fileMap[Compute("exd")][Compute("root.exl")];
-        const unwrappedOffset = UnwrapOffset(root.wrappedOffset);
-        const data = ReadDataBlocks(b, unwrappedOffset.datOffset);
-
-        const lines = [];
         setLoadingText("문자열 자료 ExL 디코딩 중...");
+        return ReadBytesFromFile(
+          props.files["0a0000"][unwrappedOffset.datFileNum]
+        ).then(b => {
+          return DecodeDataBlocks(b, root.wrappedOffset);
+        });
+      })
+      .then(data => {
+        const lines = [];
         const rootTextLines = new TextDecoder().decode(data).split("\n");
         for (let i = 0; i < rootTextLines.length; i++) {
           if (!rootTextLines[i]) continue;
@@ -92,6 +91,7 @@ const DataEditor = props => {
           directories: [],
           files: []
         };
+        const files = [];
 
         setLoadingText("문자열 자료 ExL 트리 구조 생성 중...");
         for (let line of lines) {
@@ -103,6 +103,10 @@ const DataEditor = props => {
             line.indexOf("/") !== -1
               ? "exd/" + line.substring(0, line.lastIndexOf("/"))
               : "exd";
+          if (!fileMap[Compute(directoryName)]) continue;
+          if (!fileMap[Compute(directoryName)][Compute(name + ".exh")])
+            continue;
+          const file = fileMap[Compute(directoryName)][Compute(name + ".exh")];
           const directories = directoryName.split("/");
 
           let node = tree;
@@ -125,9 +129,14 @@ const DataEditor = props => {
             key: parentKey + "-" + name,
             name: name
           });
+          files.push({
+            key: parentKey + "-" + name,
+            file: file
+          });
         }
 
         setTree(tree);
+        setFiles(files);
         setLoading(false);
       });
   }, []);
@@ -135,6 +144,14 @@ const DataEditor = props => {
   const [loading, setLoading] = React.useState(true);
   const [loadingText, setLoadingText] = React.useState("");
   const [tree, setTree] = React.useState({});
+  const [files, setFiles] = React.useState([]);
+  const [dataLoading, setDataLoading] = React.useState(false);
+  const [selectedExH, setSelectedExH] = React.useState({
+    columns: [],
+    ranges: [],
+    languages: []
+  });
+
   const renderTree = treeNode => {
     return (
       <Tree.TreeNode key={treeNode.key} title={treeNode.name}>
@@ -159,16 +176,75 @@ const DataEditor = props => {
       ) : (
         <Row gutter={16}>
           <Col
-            span={4}
+            span={6}
             style={{
-              margin: "25px",
+              padding: "25px",
               maxHeight: "calc(100vh - 291px)",
               overflow: "auto"
             }}
           >
-            <Tree.DirectoryTree>{renderTree(tree)}</Tree.DirectoryTree>
+            <Tree.DirectoryTree
+              disabled={dataLoading}
+              onSelect={(keys, event) => {
+                if (event.node.isLeaf()) {
+                  let fileInfo = files.find(
+                    f => f.key === event.node.props.eventKey
+                  ).file;
+                  if (!fileInfo) return;
+
+                  setDataLoading(true);
+                  const unwrappedOffset = UnwrapOffset(fileInfo.wrappedOffset);
+                  ReadBytesFromFile(
+                    props.files["0a0000"][unwrappedOffset.datFileNum]
+                  )
+                    .then(b => {
+                      return DecodeDataBlocks(b, fileInfo.wrappedOffset);
+                    })
+                    .then(data => {
+                      return DecodeExH(data.buffer);
+                    })
+                    .then(exh => {
+                      setSelectedExH(exh);
+                      setDataLoading(false);
+                    });
+                }
+              }}
+            >
+              {renderTree(tree)}
+            </Tree.DirectoryTree>
           </Col>
-          <Col span={20}></Col>
+          <Col span={18}>
+            {dataLoading ? (
+              <Result
+                icon={<Icon type="loading" />}
+                title="자료 디코딩 중..."
+              />
+            ) : (
+              <Tabs
+                style={{
+                  maxHeight: "calc(100vh - 291px)",
+                  minHeight: "calc(100vh - 291px)"
+                }}
+                tabPosition="left"
+              >
+                {selectedExH.ranges.map(r => {
+                  return (
+                    <Tabs.TabPane key={r.start} tab={r.start}>
+                      <Tabs tabPosition="top">
+                        {selectedExH.languages.map(l => {
+                          return (
+                            <Tabs.TabPane key={l} tab={l}>
+                              Content!
+                            </Tabs.TabPane>
+                          );
+                        })}
+                      </Tabs>
+                    </Tabs.TabPane>
+                  );
+                })}
+              </Tabs>
+            )}
+          </Col>
         </Row>
       )}
     </React.Fragment>

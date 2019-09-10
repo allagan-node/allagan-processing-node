@@ -1,7 +1,7 @@
-import { Alert, Button, Icon, Result, Upload } from "antd";
+import { Alert, Button, Icon, Result, Tabs, Upload } from "antd";
 import React from "react";
 
-import { ReadFromFile } from "../../utility";
+import { ReadBytesFromFile } from "../../utility";
 
 const DataSelector = props => {
   const [errors, setErrors] = React.useState([]);
@@ -79,7 +79,7 @@ const DataSelector = props => {
                 const diagnose = i => {
                   setLoadingText("검사 중... " + indexFiles[i].name);
 
-                  ReadFromFile(indexFiles[i]).then(b => {
+                  ReadBytesFromFile(indexFiles[i]).then(b => {
                     const dv = new DataView(b);
                     const headerOffset = dv.getInt32(0xc, true);
                     const numDat = dv.getUint8(headerOffset + 0x50, true);
