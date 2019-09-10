@@ -281,6 +281,50 @@ export const GetBytes = str => {
   return bytes;
 };
 
+export const ReadDataBlocks = (b, datOffset) => {
+  const dv = new DataView(b);
+  const endOfHeader = dv.getInt32(datOffset, true);
+  const headerDv = new DataView(b, datOffset, endOfHeader);
+  const blockCount = headerDv.getInt16(0x14, true);
+  const zlib = require("zlib");
+
+  const blocks = [];
+  for (let i = 0; i < blockCount; i++) {
+    const blockOffset =
+      datOffset + endOfHeader + headerDv.getInt32(0x18 + i * 0x8, true);
+    const blockHeaderDv = new DataView(b, blockOffset, 0x10);
+
+    const sourceSize = blockHeaderDv.getInt32(0x8, true);
+    const rawSize = blockHeaderDv.getInt32(0xc, true);
+    const isCompressed = sourceSize < 0x7d00;
+    let actualSize = isCompressed ? sourceSize : rawSize;
+
+    const paddingLeftover = (actualSize + 0x10) % 0x80;
+    if (isCompressed && paddingLeftover !== 0) {
+      actualSize += 0x80 - paddingLeftover;
+    }
+
+    let block = b.slice(blockOffset + 0x10, blockOffset + 0x10 + actualSize);
+
+    if (isCompressed) {
+      block = zlib.inflateRawSync(new Buffer(block));
+    } else {
+      block = new Uint8Array(block);
+    }
+
+    blocks.push(block);
+  }
+
+  const data = new Uint8Array(blocks.reduce((pv, cv) => pv + cv.length, 0));
+  let curDataOffset = 0;
+  for (let block of blocks) {
+    data.set(block, curDataOffset);
+    curDataOffset += block.length;
+  }
+
+  return data;
+};
+
 export const ReadFromFile = f => {
   return new Promise(resolve => {
     const fr = new FileReader();
@@ -289,4 +333,11 @@ export const ReadFromFile = f => {
     };
     fr.readAsArrayBuffer(f);
   });
+};
+
+export const UnwrapOffset = wrappedOffset => {
+  return {
+    datFileNum: ((wrappedOffset & 0x7) >>> 1) & 0xff,
+    datOffset: ((wrappedOffset & 0xfffffff8) << 3) & 0xffffffff
+  };
 };

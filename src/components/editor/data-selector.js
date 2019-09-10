@@ -1,4 +1,4 @@
-import { Alert, Button, Icon, Progress, Result, Upload } from "antd";
+import { Alert, Button, Icon, Result, Upload } from "antd";
 import React from "react";
 
 import { ReadFromFile } from "../../utility";
@@ -7,7 +7,6 @@ const DataSelector = props => {
   const [errors, setErrors] = React.useState([]);
   const [pass, setPass] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [progress, setProgress] = React.useState(0);
   const [loadingText, setLoadingText] = React.useState("");
 
   return (
@@ -43,6 +42,12 @@ const DataSelector = props => {
             title="자료 선택 완료!"
             subTitle="다음 단계로 넘어가 자료 편집을 시작하세요!"
           />
+        ) : loading ? (
+          <Result
+            icon={<Icon type="loading" />}
+            title="자료 검사 중..."
+            subTitle={loadingText}
+          />
         ) : (
           <Upload.Dragger
             accept=".index*,.dat*"
@@ -51,7 +56,6 @@ const DataSelector = props => {
 
               setErrors([]);
               setPass(false);
-              setProgress(0);
               setLoadingText("");
               setLoading(true);
 
@@ -73,7 +77,6 @@ const DataSelector = props => {
                 }
 
                 const diagnose = i => {
-                  setProgress(Math.round(((i + 1) / indexFiles.length) * 100));
                   setLoadingText("검사 중... " + indexFiles[i].name);
 
                   ReadFromFile(indexFiles[i]).then(b => {
@@ -133,28 +136,17 @@ const DataSelector = props => {
             directory={true}
             showUploadList={false}
           >
-            {loading ? (
-              <React.Fragment>
-                <div className="ant-upload-drag-icon">
-                  <Progress type="circle" percent={progress} />
-                </div>
-                <p className="ant-upload-text">{loadingText}</p>
-              </React.Fragment>
-            ) : (
-              <React.Fragment>
-                <p className="ant-upload-drag-icon">
-                  <Icon type="inbox" />
-                </p>
-                <p className="ant-upload-text">
-                  여기를 클릭하거나 자료가 담긴 폴더를 이 곳으로 드래그하여
-                  선택하세요.
-                </p>
-                <p className="ant-upload-hint">
-                  파이널 판타지 14 클라이언트 자료는 일반적으로 /game/sqpack
-                  하위 경로에 담겨져 있습니다. sqpack 폴더를 선택해주세요.
-                </p>
-              </React.Fragment>
-            )}
+            <p className="ant-upload-drag-icon">
+              <Icon type="inbox" />
+            </p>
+            <p className="ant-upload-text">
+              여기를 클릭하거나 자료가 담긴 폴더를 이 곳으로 드래그하여
+              선택하세요.
+            </p>
+            <p className="ant-upload-hint">
+              파이널 판타지 14 클라이언트 자료는 일반적으로 /game/sqpack 하위
+              경로에 담겨져 있습니다. sqpack 폴더를 선택해주세요.
+            </p>
           </Upload.Dragger>
         )}
       </div>
