@@ -1,12 +1,13 @@
-import { Col, Icon, message, Result, Row, Tabs, Tree } from "antd";
+import { Col, Icon, message, Result, Row, Spin, Table, Tabs, Tree } from "antd";
 import React, { useEffect } from "react";
 
 import {
   Compute,
   DecodeDataBlocks,
+  DecodeExH,
+  GetLanguageCode,
   ReadBytesFromFile,
-  UnwrapOffset,
-  DecodeExH
+  UnwrapOffset
 } from "../../utility";
 
 const DataEditor = props => {
@@ -131,6 +132,8 @@ const DataEditor = props => {
           });
           files.push({
             key: parentKey + "-" + name,
+            directoryName: directoryName,
+            name: name,
             file: file
           });
         }
@@ -146,11 +149,10 @@ const DataEditor = props => {
   const [tree, setTree] = React.useState({});
   const [files, setFiles] = React.useState([]);
   const [dataLoading, setDataLoading] = React.useState(false);
-  const [selectedExH, setSelectedExH] = React.useState({
-    columns: [],
-    ranges: [],
-    languages: []
-  });
+  const [selectedExH, setSelectedExH] = React.useState(false);
+  const [tableLoading, setTableLoading] = React.useState(true);
+  const [tableColumns, setTableColumns] = React.useState([]);
+  const [tableDataSource, setTableDataSource] = React.useState([]);
 
   const renderTree = treeNode => {
     return (
@@ -163,6 +165,13 @@ const DataEditor = props => {
         })}
       </Tree.TreeNode>
     );
+  };
+
+  const loadTable = (name, directoryName, rangeStart, langCode) => {
+    setTableLoading(true);
+
+    console.log(directoryName);
+    console.log(name + "_" + rangeStart + "_" + langCode + ".exd");
   };
 
   return (
@@ -189,22 +198,40 @@ const DataEditor = props => {
                 if (event.node.isLeaf()) {
                   let fileInfo = files.find(
                     f => f.key === event.node.props.eventKey
-                  ).file;
+                  );
                   if (!fileInfo) return;
 
                   setDataLoading(true);
-                  const unwrappedOffset = UnwrapOffset(fileInfo.wrappedOffset);
+                  const unwrappedOffset = UnwrapOffset(
+                    fileInfo.file.wrappedOffset
+                  );
                   ReadBytesFromFile(
                     props.files["0a0000"][unwrappedOffset.datFileNum]
                   )
                     .then(b => {
-                      return DecodeDataBlocks(b, fileInfo.wrappedOffset);
+                      return DecodeDataBlocks(b, fileInfo.file.wrappedOffset);
                     })
                     .then(data => {
                       return DecodeExH(data.buffer);
                     })
                     .then(exh => {
+                      exh.name = fileInfo.name;
+                      exh.directoryName = fileInfo.directoryName;
                       setSelectedExH(exh);
+
+                      if (
+                        exh.variant === 1 &&
+                        exh.ranges.length > 0 &&
+                        exh.languages.length > 0
+                      ) {
+                        loadTable(
+                          exh.name,
+                          exh.directoryName,
+                          exh.ranges[0].start,
+                          GetLanguageCode(exh.languages[0])
+                        );
+                      }
+
                       setDataLoading(false);
                     });
                 }
@@ -219,30 +246,62 @@ const DataEditor = props => {
                 icon={<Icon type="loading" />}
                 title="자료 디코딩 중..."
               />
-            ) : (
+            ) : selectedExH ? (
               <Tabs
+                onChange={key => {
+                  console.log(key);
+                }}
+                style={{ height: "calc(100vh - 291px)" }}
+                tabPosition="left"
+              >
+                {selectedExH.variant === 1 &&
+                selectedExH.ranges.length > 0 &&
+                selectedExH.languages.length > 0 ? (
+                  selectedExH.ranges.map(r => {
+                    return (
+                      <Tabs.TabPane key={r.start} tab={r.start}>
+                        <Tabs
+                          onChange={key => {
+                            console.log(key);
+                          }}
+                          tabPosition="top"
+                        >
+                          {selectedExH.languages.map(l => {
+                            return (
+                              <Tabs.TabPane key={l} tab={GetLanguageCode(l)}>
+                                <Spin
+                                  indicator={<Icon type="loading" />}
+                                  spinning={tableLoading}
+                                >
+                                  <Table
+                                    columns={tableColumns}
+                                    dataSource={tableDataSource}
+                                  />
+                                </Spin>
+                              </Tabs.TabPane>
+                            );
+                          })}
+                        </Tabs>
+                      </Tabs.TabPane>
+                    );
+                  })
+                ) : (
+                  <Tabs.TabPane key="0" tab="0">
+                    <Result
+                      status="error"
+                      title="해당 ExH 형식은 아직 지원하지 않습니다."
+                    />
+                  </Tabs.TabPane>
+                )}
+              </Tabs>
+            ) : (
+              <Result
                 style={{
                   maxHeight: "calc(100vh - 291px)",
                   minHeight: "calc(100vh - 291px)"
                 }}
-                tabPosition="left"
-              >
-                {selectedExH.ranges.map(r => {
-                  return (
-                    <Tabs.TabPane key={r.start} tab={r.start}>
-                      <Tabs tabPosition="top">
-                        {selectedExH.languages.map(l => {
-                          return (
-                            <Tabs.TabPane key={l} tab={l}>
-                              Content!
-                            </Tabs.TabPane>
-                          );
-                        })}
-                      </Tabs>
-                    </Tabs.TabPane>
-                  );
-                })}
-              </Tabs>
+                title="왼쪽 트리에서 편집할 ExH를 선택해주세요."
+              />
             )}
           </Col>
         </Row>

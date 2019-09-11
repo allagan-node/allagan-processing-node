@@ -273,31 +273,6 @@ export const Compute = str => {
   return new Uint32Array([hash])[0];
 };
 
-export const GetBytes = str => {
-  const bytes = [];
-  for (let i = 0; i < str.length; i++) {
-    bytes.push(str.charCodeAt(i));
-  }
-  return bytes;
-};
-
-export const UnwrapOffset = wrappedOffset => {
-  return {
-    datFileNum: ((wrappedOffset & 0x7) >>> 1) & 0xff,
-    datOffset: ((wrappedOffset & 0xfffffff8) << 3) & 0xffffffff
-  };
-};
-
-export const ReadBytesFromFile = f => {
-  return new Promise(resolve => {
-    const fr = new FileReader();
-    fr.onload = e => {
-      resolve(e.target.result);
-    };
-    fr.readAsArrayBuffer(f);
-  });
-};
-
 export const DecodeDataBlocks = (b, wrappedOffset) => {
   const unwrappedOffset = UnwrapOffset(wrappedOffset);
   const datOffset = unwrappedOffset.datOffset;
@@ -357,7 +332,7 @@ export const DecodeExH = data => {
 
   exh.columns = [];
   for (let i = 0; i < colCount; i++) {
-    let colOffset = 0x20 + i * 0x4;
+    const colOffset = 0x20 + i * 0x4;
     exh.columns.push({
       type: dv.getUint16(colOffset, false),
       offset: dv.getUint16(colOffset + 0x2, false)
@@ -366,7 +341,7 @@ export const DecodeExH = data => {
 
   exh.ranges = [];
   for (let i = 0; i < rangeCount; i++) {
-    let rangeOffset = 0x20 + colCount * 0x4 + i * 0x8;
+    const rangeOffset = 0x20 + colCount * 0x4 + i * 0x8;
     exh.ranges.push({
       start: dv.getInt32(rangeOffset, false),
       length: dv.getInt32(rangeOffset + 0x4, false)
@@ -375,9 +350,56 @@ export const DecodeExH = data => {
 
   exh.languages = [];
   for (let i = 0; i < langCount; i++) {
-    let langOffset = 0x20 + colCount * 0x4 + rangeCount * 0x8 + i * 0x2;
-    exh.languages.push(dv.getUint8(langOffset));
+    const langOffset = 0x20 + colCount * 0x4 + rangeCount * 0x8 + i * 0x2;
+    const lang = dv.getUint8(langOffset);
+    if (lang !== 0) exh.languages.push(lang);
   }
 
   return exh;
+};
+
+export const GetBytes = str => {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    bytes.push(str.charCodeAt(i));
+  }
+  return bytes;
+};
+
+export const GetLanguageCode = l => {
+  switch (l) {
+    case 1:
+      return "ja";
+    case 2:
+      return "en";
+    case 3:
+      return "de";
+    case 4:
+      return "fr";
+    case 5:
+      return "chs";
+    case 6:
+      return "cht";
+    case 7:
+      return "ko";
+  }
+
+  return "";
+};
+
+export const ReadBytesFromFile = f => {
+  return new Promise(resolve => {
+    const fr = new FileReader();
+    fr.onload = e => {
+      resolve(e.target.result);
+    };
+    fr.readAsArrayBuffer(f);
+  });
+};
+
+export const UnwrapOffset = wrappedOffset => {
+  return {
+    datFileNum: ((wrappedOffset & 0x7) >>> 1) & 0xff,
+    datOffset: ((wrappedOffset & 0xfffffff8) << 3) & 0xffffffff
+  };
 };
