@@ -140,6 +140,7 @@ const DataEditor = props => {
 
         setTree(tree);
         setFiles(files);
+        setFileMap(fileMap);
         setLoading(false);
       });
   }, []);
@@ -148,11 +149,14 @@ const DataEditor = props => {
   const [loadingText, setLoadingText] = React.useState("");
   const [tree, setTree] = React.useState({});
   const [files, setFiles] = React.useState([]);
+  const [fileMap, setFileMap] = React.useState({});
   const [dataLoading, setDataLoading] = React.useState(false);
   const [selectedExH, setSelectedExH] = React.useState(false);
   const [tableLoading, setTableLoading] = React.useState(true);
   const [tableColumns, setTableColumns] = React.useState([]);
   const [tableDataSource, setTableDataSource] = React.useState([]);
+  const [selectedRange, setSelectedRange] = React.useState();
+  const [selectedLanguage, setSelectedLanguage] = React.useState();
 
   const renderTree = treeNode => {
     return (
@@ -167,11 +171,113 @@ const DataEditor = props => {
     );
   };
 
-  const loadTable = (name, directoryName, rangeStart, langCode) => {
+  const loadTable = (
+    name,
+    directoryName,
+    rangeStart,
+    langCode,
+    columns,
+    fixedSizeDataLength
+  ) => {
     setTableLoading(true);
 
-    console.log(directoryName);
+    if (!fileMap[Compute(directoryName)]) {
+      setTableLoading(false);
+      return;
+    }
+
     console.log(name + "_" + rangeStart + "_" + langCode + ".exd");
+
+    const targetFile =
+      fileMap[Compute(directoryName)][
+        Compute(name + "_" + rangeStart + "_" + langCode + ".exd")
+      ];
+
+    if (!targetFile) {
+      setTableLoading(false);
+      return;
+    }
+
+    const unwrappedOffset = UnwrapOffset(targetFile.wrappedOffset);
+    ReadBytesFromFile(props.files["0a0000"][unwrappedOffset.datFileNum])
+      .then(b => {
+        return DecodeDataBlocks(b, targetFile.wrappedOffset);
+      })
+      .then(data => {
+        const tableColumns = [];
+        for (let column of columns) {
+          if (column.type === 0x0) {
+            tableColumns.push({
+              title: column.offset,
+              key: column.offset,
+              dataIndex: column.offset,
+              render: b => {
+                return b && b.length > 0
+                  ? new TextDecoder().decode(new Uint8Array(b).buffer)
+                  : "";
+              }
+            });
+          }
+        }
+        setTableColumns(tableColumns);
+
+        const tableDataSource = [];
+
+        const dv = new DataView(data.buffer);
+        const offsetTableSize = dv.getInt32(0x8, false);
+        const chunkTableSize = dv.getInt32(0xc, false);
+
+        const offsetDv = new DataView(data.buffer, 0x20, offsetTableSize);
+
+        for (let i = 0; i < offsetTableSize; i += 0x8) {
+          const key = offsetDv.getInt32(i, false);
+          const chunkOffset = offsetDv.getInt32(i + 0x4, false);
+
+          const chunkHeaderDv = new DataView(data.buffer, chunkOffset, 0x6);
+          const chunkColumnDefinitionDv = new DataView(
+            data.buffer,
+            chunkOffset + 0x6,
+            fixedSizeDataLength
+          );
+
+          const chunkSize = chunkHeaderDv.getInt32(0x0, false);
+          const chunkCheckDigit = chunkHeaderDv.getInt16(0x4, false);
+
+          const chunkRawDataDv = new DataView(
+            data.buffer,
+            chunkOffset + 0x6 + fixedSizeDataLength,
+            chunkSize - fixedSizeDataLength
+          );
+          const row = {
+            key: key
+          };
+
+          for (let column of tableColumns) {
+            let fieldIndex = chunkColumnDefinitionDv.getInt32(
+              column.key,
+              false
+            );
+            const fields = [];
+
+            let b = chunkRawDataDv.getUint8(fieldIndex);
+            while (b !== 0x0) {
+              fields.push(b);
+              fieldIndex++;
+              if (fieldIndex >= chunkRawDataDv.byteLength) break;
+              b = chunkRawDataDv.getUint8(fieldIndex);
+            }
+
+            row[column.key] = fields;
+          }
+
+          tableDataSource.push(row);
+        }
+
+        setTableDataSource(tableDataSource);
+        setSelectedRange(rangeStart);
+        setSelectedLanguage(langCode);
+        setTableLoading(false);
+      });
   };
 
   return (
@@ -228,7 +334,9 @@ const DataEditor = props => {
                           exh.name,
                           exh.directoryName,
                           exh.ranges[0].start,
-                          GetLanguageCode(exh.languages[0])
+                          GetLanguageCode(exh.languages[0]),
+                          exh.columns,
+                          exh.fixedSizeDataLength
                         );
                       }
 
@@ -249,7 +357,14 @@ const DataEditor = props => {
             ) : selectedExH ? (
               <Tabs
                 onChange={key => {
-                  console.log(key);
+                  loadTable(
+                    selectedExH.name,
+                    selectedExH.directoryName,
+                    key,
+                    selectedLanguage,
+                    selectedExH.columns,
+                    selectedExH.fixedSizeDataLength
+                  );
                 }}
                 style={{ height: "calc(100vh - 291px)" }}
                 tabPosition="left"
@@ -262,7 +377,16 @@ const DataEditor = props => {
                       <Tabs.TabPane key={r.start} tab={r.start}>
                         <Tabs
                           onChange={key => {
-                            console.log(key);
+                            console.log(selectedRange);
+
+                            loadTable(
+                              selectedExH.name,
+                              selectedExH.directoryName,
+                              selectedRange,
+                              GetLanguageCode(parseInt(key)),
+                              selectedExH.columns,
+                              selectedExH.fixedSizeDataLength
+                            );
                           }}
                           tabPosition="top"
                         >
