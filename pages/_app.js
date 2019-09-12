@@ -17,9 +17,6 @@ class AllaganProcessingNode extends App {
         <TopHeader />
         <Layout.Content style={{ minHeight: "100vh", paddingTop: "64px" }}>
           <Component {...pageProps} />
-          <Layout.Footer style={{ textAlign: "center" }}>
-            알라그 가공 시스템
-          </Layout.Footer>
         </Layout.Content>
       </Layout>
     );

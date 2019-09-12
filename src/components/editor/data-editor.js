@@ -186,8 +186,6 @@ const DataEditor = props => {
       return;
     }
 
-    console.log(name + "_" + rangeStart + "_" + langCode + ".exd");
-
     const targetFile =
       fileMap[Compute(directoryName)][
         Compute(name + "_" + rangeStart + "_" + langCode + ".exd")
@@ -294,7 +292,7 @@ const DataEditor = props => {
             span={6}
             style={{
               padding: "25px",
-              maxHeight: "calc(100vh - 291px)",
+              maxHeight: "calc(100vh - 200px)",
               overflow: "auto"
             }}
           >
@@ -366,7 +364,7 @@ const DataEditor = props => {
                     selectedExH.fixedSizeDataLength
                   );
                 }}
-                style={{ height: "calc(100vh - 291px)" }}
+                style={{ height: "calc(100vh - 200px)" }}
                 tabPosition="left"
               >
                 {selectedExH.variant === 1 &&
@@ -374,11 +372,16 @@ const DataEditor = props => {
                 selectedExH.languages.length > 0 ? (
                   selectedExH.ranges.map(r => {
                     return (
-                      <Tabs.TabPane key={r.start} tab={r.start}>
+                      <Tabs.TabPane
+                        key={r.start}
+                        style={{
+                          height: "calc(100vh - 200px)",
+                          overflow: "auto"
+                        }}
+                        tab={r.start}
+                      >
                         <Tabs
                           onChange={key => {
-                            console.log(selectedRange);
-
                             loadTable(
                               selectedExH.name,
                               selectedExH.directoryName,
@@ -421,8 +424,8 @@ const DataEditor = props => {
             ) : (
               <Result
                 style={{
-                  maxHeight: "calc(100vh - 291px)",
-                  minHeight: "calc(100vh - 291px)"
+                  maxHeight: "calc(100vh - 200px)",
+                  minHeight: "calc(100vh - 200px)"
                 }}
                 title="왼쪽 트리에서 편집할 ExH를 선택해주세요."
               />

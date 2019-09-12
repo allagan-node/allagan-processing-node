@@ -15,7 +15,7 @@ const Editor = props => {
   const [files, setFiles] = React.useState({});
 
   return (
-    <Card style={{ margin: "25px 25px 0 25px" }}>
+    <Card style={{ margin: "25px" }}>
       <Steps current={current}>
         <Steps.Step title="편집할 자료 선택" />
         <Steps.Step title="편집" />
