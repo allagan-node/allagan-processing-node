@@ -1,6 +1,6 @@
 import { Icon, Layout, Menu } from "antd";
-import React, { useEffect } from "react";
 import Router from "next/router";
+import React, { useEffect } from "react";
 
 const TopHeader = props => {
   useEffect(() => {
@@ -27,7 +27,7 @@ const TopHeader = props => {
         <Menu.Item key="/" onClick={() => Router.push("/")}>
           알라그 가공 시스템
         </Menu.Item>
-        <Menu.Item key="/editor" onClick={() => Router.push("/editor")}>
+        <Menu.Item key="/editor/1" onClick={() => Router.push("/editor/1")}>
           <Icon type="edit" />
           편집 도구
         </Menu.Item>

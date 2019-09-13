@@ -12,7 +12,7 @@ const Index = props => {
       />
       <Row justify="center" style={{ marginTop: "25px" }} type="flex">
         <Col span={8}>
-          <Card hoverable onClick={() => Router.push("/editor")}>
+          <Card hoverable onClick={() => Router.push("/editor/1")}>
             <Card.Meta
               avatar={<Avatar icon="edit" />}
               description="편집 도구를 사용해 자료 편집이 가능합니다."

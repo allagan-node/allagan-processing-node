@@ -273,10 +273,7 @@ export const Compute = str => {
   return new Uint32Array([hash])[0];
 };
 
-export const DecodeDataBlocks = (b, wrappedOffset) => {
-  const unwrappedOffset = UnwrapOffset(wrappedOffset);
-  const datOffset = unwrappedOffset.datOffset;
-
+export const DecodeDataBlocks = (b, datOffset) => {
   const dv = new DataView(b);
   const endOfHeader = dv.getInt32(datOffset, true);
   const headerDv = new DataView(b, datOffset, endOfHeader);
@@ -320,9 +317,65 @@ export const DecodeDataBlocks = (b, wrappedOffset) => {
   return data;
 };
 
+export const DecodeExD = (data, columns, fixedSizeDataLength) => {
+  const rows = [];
+
+  const dv = new DataView(data.buffer);
+  const offsetTableSize = dv.getInt32(0x8, false);
+  const offsetDv = new DataView(data.buffer, 0x20, offsetTableSize);
+  for (let i = 0; i < offsetTableSize; i += 0x8) {
+    const key = offsetDv.getInt32(i, false);
+    const chunkOffset = offsetDv.getInt32(i + 0x4, false);
+
+    const chunkHeaderDv = new DataView(data.buffer, chunkOffset, 0x6);
+    const chunkColumnDefinitionDv = new DataView(
+      data.buffer,
+      chunkOffset + 0x6,
+      fixedSizeDataLength
+    );
+
+    const chunkSize = chunkHeaderDv.getInt32(0x0, false);
+    const chunkCheckDigit = chunkHeaderDv.getInt16(0x4, false);
+    console.log(chunkCheckDigit);
+
+    const chunkRawDataDv = new DataView(
+      data.buffer,
+      chunkOffset + 0x6 + fixedSizeDataLength,
+      chunkSize - fixedSizeDataLength
+    );
+    const row = {
+      key: key
+    };
+
+    for (let column of columns) {
+      if (column.type === 0x0) {
+        let curFieldIndex = chunkColumnDefinitionDv.getInt32(
+          column.offset,
+          false
+        );
+        const field = [];
+
+        let b = chunkRawDataDv.getUint8(curFieldIndex);
+        while (b !== 0x0) {
+          field.push(b);
+          curFieldIndex++;
+          if (curFieldIndex >= chunkRawDataDv.byteLength) break;
+          b = chunkRawDataDv.getUint8(curFieldIndex);
+        }
+
+        row[column.offset] = new Uint8Array(field);
+      }
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+};
+
 export const DecodeExH = data => {
   const exh = {};
-  const dv = new DataView(data);
+  const dv = new DataView(data.buffer);
   exh.fixedSizeDataLength = dv.getUint16(0x6, false);
   exh.variant = dv.getUint16(0x10, false);
 
