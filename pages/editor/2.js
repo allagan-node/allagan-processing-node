@@ -1,4 +1,4 @@
-import {Alert, Card, Progress, Result, Steps} from "antd";
+import {Alert, Card, Icon, Result, Steps} from "antd";
 import Router from "next/router";
 import React from "react";
 
@@ -14,7 +14,6 @@ class EditorSecond extends React.Component {
         this.state = {
             errors: [],
             loading: true,
-            loadingProgress: 0,
             loadingText: "",
             dataMap: {},
             dataTree: {
@@ -37,41 +36,51 @@ class EditorSecond extends React.Component {
             return;
         }
 
+        this.state.loadingText = "문자열 자료 읽어들이는 중...";
+        this.setState(this.state, this.cacheData);
+    }
+
+    async cacheData() {
+        const data = this.context.files["0a0000"];
+        const dataKeys = Object.keys(data);
+
+        for (let dataKey of dataKeys) {
+            await ReadBytesFromFile(data[dataKey]).then(b => {
+                data[dataKey + "-cache"] = b;
+            });
+        }
+
         this.state.loadingText = "문자열 자료 매핑 중...";
         this.setState(this.state, this.constructDataMap);
     }
 
-    constructDataMap() {
-        ReadBytesFromFile(this.context.files["0a0000"].index)
-            .then(b => {
-                const dv = new DataView(b);
-                const headerOffset = dv.getInt32(0xc, true);
-                const fileOffset = dv.getInt32(headerOffset + 0x8, true);
-                const fileCount = dv.getInt32(headerOffset + 0xc, true) / 0x10;
+    async constructDataMap() {
+        const dv = new DataView(this.context.files["0a0000"]["index-cache"]);
+        const headerOffset = dv.getInt32(0xc, true);
+        const fileOffset = dv.getInt32(headerOffset + 0x8, true);
+        const fileCount = dv.getInt32(headerOffset + 0xc, true) / 0x10;
 
-                for (let i = 0; i < fileCount; i++) {
-                    const curFileOffset = fileOffset + i * 0x10;
-                    const key = dv.getUint32(curFileOffset, true);
-                    const directoryKey = dv.getUint32(curFileOffset + 0x4, true);
-                    const wrappedOffset = dv.getUint32(curFileOffset + 0x8, true);
-                    const unwrappedOffset = UnwrapOffset(wrappedOffset);
+        for (let i = 0; i < fileCount; i++) {
+            const curFileOffset = fileOffset + i * 0x10;
+            const key = dv.getUint32(curFileOffset, true);
+            const directoryKey = dv.getUint32(curFileOffset + 0x4, true);
+            const wrappedOffset = dv.getUint32(curFileOffset + 0x8, true);
+            const unwrappedOffset = UnwrapOffset(wrappedOffset);
 
-                    if (!this.state.dataMap[directoryKey]) {
-                        this.state.dataMap[directoryKey] = {};
-                    }
+            if (!this.state.dataMap[directoryKey]) {
+                this.state.dataMap[directoryKey] = {};
+            }
 
-                    this.state.dataMap[directoryKey][key] = {
-                        key: key,
-                        directoryKey: directoryKey,
-                        datFileNum: unwrappedOffset.datFileNum,
-                        datOffset: unwrappedOffset.datOffset
-                    };
-                }
-            })
-            .then(() => {
-                this.state.loadingText = "문자열 자료 ExL 디코딩 중...";
-                this.setState(this.state, this.decodeExL);
-            });
+            this.state.dataMap[directoryKey][key] = {
+                key: key,
+                directoryKey: directoryKey,
+                datFileNum: unwrappedOffset.datFileNum,
+                datOffset: unwrappedOffset.datOffset
+            };
+        }
+
+        this.state.loadingText = "문자열 자료 ExL 디코딩 중...";
+        this.setState(this.state, this.decodeExL);
     }
 
     decodeExL() {
@@ -88,33 +97,30 @@ class EditorSecond extends React.Component {
         rootExL.name = "root.exl";
         rootExL.directoryName = "exd";
 
-        ReadBytesFromFile(this.context.files["0a0000"][rootExL.datFileNum])
-            .then(b => {
-                return DecodeDataBlocks(b, rootExL.datOffset);
-            })
-            .then(data => {
-                const lines = [];
+        const data = DecodeDataBlocks(
+            this.context.files["0a0000"][rootExL.datFileNum + "-cache"],
+            rootExL.datOffset
+        );
+        const lines = [];
+        const rootLines = new TextDecoder().decode(data).split("\n");
 
-                const rootLines = new TextDecoder().decode(data).split("\n");
-                for (let i = 0; i < rootLines.length; i++) {
-                    if (!rootLines[i]) continue;
-                    const rootLineCols = rootLines[i].split(",");
-                    if (rootLineCols.length !== 2) continue;
-                    lines.push(rootLineCols[0]);
-                }
+        for (let rootLine of rootLines) {
+            const rootLineCols = rootLine.split(",");
+            if (rootLineCols.length !== 2) continue;
+            lines.push(rootLineCols[0]);
+        }
 
-                if (lines.length === 0) {
-                    this.state.errors.push(
-                        "ExL 디코딩에 실패했습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
-                    );
-                    this.state.loading = false;
-                    this.setState(this.state);
-                    return;
-                }
+        if (lines.length === 0) {
+            this.state.errors.push(
+                "ExL 디코딩에 실패했습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
+            );
+            this.state.loading = false;
+            this.setState(this.state);
+            return;
+        }
 
-                this.state.loadingText = "문자열 자료 ExH 등록 중...";
-                this.setState(this.state, () => this.buildTreeNode(lines));
-            });
+        this.state.loadingText = "문자열 자료 ExH 등록 중...";
+        this.setState(this.state, () => this.buildTreeNode(lines));
     }
 
     buildTreeNode(lines) {
@@ -169,39 +175,23 @@ class EditorSecond extends React.Component {
 
     async decodeExH() {
         const exHs = this.retrieveFiles(this.state.dataTree);
-        for (let [i, exH] of exHs.entries()) {
-            await new Promise((resolve, reject) => {
-                this.state.loadingText = "문자열 자료 ExH 디코딩 중..." + exH.name;
-                this.setState(this.state, resolve);
-            })
-                .then(() => {
-                    return ReadBytesFromFile(
-                        this.context.files["0a0000"][exH.exHData.datFileNum]
-                    );
-                })
-                .then(b => {
-                    return DecodeDataBlocks(b, exH.exHData.datOffset);
-                })
-                .then(data => {
-                    return DecodeExH(data);
-                })
-                .then(decodedExH => {
-                    if (
-                        decodedExH.variant === 1 &&
-                        decodedExH.ranges.length > 0 &&
-                        decodedExH.languages.length > 0
-                    ) {
-                        exH.decodedExH = decodedExH;
-                    }
-                });
+        for (let exH of exHs) {
+            const data = DecodeDataBlocks(
+                this.context.files["0a0000"][exH.exHData.datFileNum + "-cache"],
+                exH.exHData.datOffset
+            );
+            const decodedExH = DecodeExH(data);
+            if (
+                decodedExH.variant === 1 &&
+                decodedExH.ranges.length > 0 &&
+                decodedExH.languages.length > 0
+            ) {
+                exH.decodedExH = decodedExH;
+            }
         }
 
         this.state.loadingText = "문자열 자료 트리 정리 중...";
         this.setState(this.state, this.cleanUpTree);
-    }
-
-    cleanUpTree() {
-        console.log(this.state.dataTree);
     }
 
     retrieveFiles(node) {
@@ -218,6 +208,23 @@ class EditorSecond extends React.Component {
         }
 
         return files;
+    }
+
+    cleanUpTree() {
+        this.cleanUpNode(this.state.dataTree);
+        console.log(this.state.dataTree);
+    }
+
+    cleanUpNode(node) {
+        let index = node.files.findIndex(f => !f.decodedExH);
+        while (index !== -1) {
+            node.files.splice(index, 1);
+            index = node.files.findIndex(f => !f.decodedExH);
+        }
+
+        for (let directory of node.directories) {
+            this.cleanUpNode(directory);
+        }
     }
 
     render() {
@@ -247,9 +254,7 @@ class EditorSecond extends React.Component {
                 {this.state.loading && (
                     <div style={{marginTop: "25px"}}>
                         <Result
-                            icon={
-                                <Progress type="circle" percent={this.state.loadingProgress}/>
-                            }
+                            icon={<Icon type="loading"/>}
                             title="트리 생성 중..."
                             subTitle={this.state.loadingText}
                         />
