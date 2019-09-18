@@ -397,7 +397,8 @@ export const DecodeExH = data => {
         const rangeOffset = 0x20 + colCount * 0x4 + i * 0x8;
         exh.ranges.push({
             start: dv.getInt32(rangeOffset, false),
-            length: dv.getInt32(rangeOffset + 0x4, false)
+            length: dv.getInt32(rangeOffset + 0x4, false),
+            loaded: false
         });
     }
 
@@ -405,7 +406,12 @@ export const DecodeExH = data => {
     for (let i = 0; i < langCount; i++) {
         const langOffset = 0x20 + colCount * 0x4 + rangeCount * 0x8 + i * 0x2;
         const lang = dv.getUint8(langOffset);
-        if (lang !== 0) exh.languages.push(lang);
+        if (lang !== 0)
+            exh.languages.push({
+                lang: lang,
+                code: GetLanguageCode(lang),
+                loaded: false
+            });
     }
 
     return exh;

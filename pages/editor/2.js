@@ -190,8 +190,8 @@ class EditorSecond extends React.Component {
             }
         }
 
-        this.state.loadingText = "문자열 자료 트리 정리 중...";
-        this.setState(this.state, this.cleanUpTree);
+        this.state.loadingText = "문자열 자료 ExD 디코딩 중...";
+        this.setState(this.state, this.decodeExD);
     }
 
     retrieveFiles(node) {
@@ -210,9 +210,39 @@ class EditorSecond extends React.Component {
         return files;
     }
 
+    decodeExD() {
+        const exHs = this.retrieveFiles(this.state.dataTree);
+        for (let exH of exHs) {
+            if (!exH.decodedExH) continue;
+
+            for (let range of exH.decodedExH.ranges) {
+                for (let lang of exH.decodedExH.languages) {
+                    const exDName =
+                        exH.name + "_" + range.start + "_" + lang.code + ".exd";
+                    if (!this.state.dataMap[Compute(exH.directoryName)]) continue;
+                    if (!this.state.dataMap[Compute(exH.directoryName)][Compute(exDName)])
+                        continue;
+
+                    const exDData = this.state.dataMap[Compute(exH.directoryName)][
+                        Compute(exDName)
+                        ];
+                    const data = DecodeDataBlocks(
+                        this.context.files["0a0000"][exDData.datFileNum + "-cache"],
+                        exDData.datOffset
+                    );
+
+                    range.loaded = true;
+                    lang.loaded = true;
+                }
+            }
+        }
+
+        this.state.loadingText = "문자열 자료 트리 정리 중...";
+        this.setState(this.state, this.cleanUpTree);
+    }
+
     cleanUpTree() {
         this.cleanUpNode(this.state.dataTree);
-        console.log(this.state.dataTree);
     }
 
     cleanUpNode(node) {
@@ -258,6 +288,11 @@ class EditorSecond extends React.Component {
                             title="트리 생성 중..."
                             subTitle={this.state.loadingText}
                         />
+                    </div>
+                )}
+                {!this.state.loading && (
+                    <div style={{marginTop: "25px"}}>
+                        {this.renderEditor(this.state)}
                     </div>
                 )}
             </Card>
