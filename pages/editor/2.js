@@ -3,7 +3,7 @@ import Router from "next/router";
 import React from "react";
 
 import EditorContext from "../../src/contexts/editor-context";
-import {Compute, DecodeDataBlocks, DecodeExH, ReadBytesFromFile, UnwrapOffset} from "../../src/utility";
+import {Compute, DecodeDataBlocks, DecodeExD, DecodeExH, ReadBytesFromFile, UnwrapOffset} from "../../src/utility";
 
 class EditorSecond extends React.Component {
     static contextType = EditorContext;
@@ -165,6 +165,7 @@ class EditorSecond extends React.Component {
             node.files.push({
                 key: parentKey + "-" + name,
                 name: name,
+                directoryName: directoryName,
                 exHData: exHData
             });
         }
@@ -215,6 +216,23 @@ class EditorSecond extends React.Component {
         for (let exH of exHs) {
             if (!exH.decodedExH) continue;
 
+            const tableColumns = [];
+            for (let column of exH.decodedExH.columns) {
+                if (column.type === 0x0) {
+                    tableColumns.push({
+                        title: column.offset,
+                        key: column.offset,
+                        dataIndex: column.offset,
+                        render: b =>
+                            b && b.length > 0
+                                ? new TextDecoder().decode(new Uint8Array(b).buffer)
+                                : "NULL"
+                    });
+                }
+            }
+            if (tableColumns.length === 0) continue;
+            exH.tableColumns = tableColumns;
+
             for (let range of exH.decodedExH.ranges) {
                 for (let lang of exH.decodedExH.languages) {
                     const exDName =
@@ -231,6 +249,16 @@ class EditorSecond extends React.Component {
                         exDData.datOffset
                     );
 
+                    const tableDataSource = DecodeExD(
+                        data,
+                        tableColumns,
+                        exH.decodedExH.fixedSizeDataLength
+                    );
+
+                    exH[exDName] = {
+                        data: exDData,
+                        tableDataSource: tableDataSource
+                    };
                     range.loaded = true;
                     lang.loaded = true;
                 }
@@ -243,6 +271,7 @@ class EditorSecond extends React.Component {
 
     cleanUpTree() {
         this.cleanUpNode(this.state.dataTree);
+        console.log(this.state.dataTree);
     }
 
     cleanUpNode(node) {
@@ -292,7 +321,7 @@ class EditorSecond extends React.Component {
                 )}
                 {!this.state.loading && (
                     <div style={{marginTop: "25px"}}>
-                        {this.renderEditor(this.state)}
+                        {/*this.renderEditor(this.state)*/}
                     </div>
                 )}
             </Card>

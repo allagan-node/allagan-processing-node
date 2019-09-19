@@ -317,7 +317,7 @@ export const DecodeDataBlocks = (b, datOffset) => {
     return data;
 };
 
-export const DecodeExD = (data, columns, fixedSizeDataLength) => {
+export const DecodeExD = (data, tableColumns, fixedSizeDataLength) => {
     const rows = [];
 
     const dv = new DataView(data.buffer);
@@ -336,7 +336,7 @@ export const DecodeExD = (data, columns, fixedSizeDataLength) => {
 
         const chunkSize = chunkHeaderDv.getInt32(0x0, false);
         const chunkCheckDigit = chunkHeaderDv.getInt16(0x4, false);
-        console.log(chunkCheckDigit);
+        if (chunkCheckDigit !== 1) continue;
 
         const chunkRawDataDv = new DataView(
             data.buffer,
@@ -347,24 +347,22 @@ export const DecodeExD = (data, columns, fixedSizeDataLength) => {
             key: key
         };
 
-        for (let column of columns) {
-            if (column.type === 0x0) {
-                let curFieldIndex = chunkColumnDefinitionDv.getInt32(
-                    column.offset,
-                    false
-                );
-                const field = [];
+        for (let column of tableColumns) {
+            let curFieldIndex = chunkColumnDefinitionDv.getInt32(
+                column.dataIndex,
+                false
+            );
+            const field = [];
 
-                let b = chunkRawDataDv.getUint8(curFieldIndex);
-                while (b !== 0x0) {
-                    field.push(b);
-                    curFieldIndex++;
-                    if (curFieldIndex >= chunkRawDataDv.byteLength) break;
-                    b = chunkRawDataDv.getUint8(curFieldIndex);
-                }
-
-                row[column.offset] = new Uint8Array(field);
+            let b = chunkRawDataDv.getUint8(curFieldIndex);
+            while (b !== 0x0) {
+                field.push(b);
+                curFieldIndex++;
+                if (curFieldIndex >= chunkRawDataDv.byteLength) break;
+                b = chunkRawDataDv.getUint8(curFieldIndex);
             }
+
+            row[column.dataIndex] = new Uint8Array(field);
         }
 
         rows.push(row);
