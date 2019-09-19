@@ -1,4 +1,4 @@
-import {Alert, Card, Icon, Result, Steps} from "antd";
+import {Alert, Button, Card, Icon, Progress, Result, Steps} from "antd";
 import Router from "next/router";
 import React from "react";
 
@@ -15,12 +15,16 @@ class EditorSecond extends React.Component {
             errors: [],
             loading: true,
             loadingText: "",
+            loadingSubText: "",
+            loadingProgress: 0,
+            loadingStepProgress: 0,
             dataMap: {},
             dataTree: {
                 key: "root",
-                name: "root",
-                directories: [],
-                files: []
+                value: "Root",
+                title: "Root",
+                children: [],
+                selectable: false
             }
         };
     }
@@ -36,189 +40,271 @@ class EditorSecond extends React.Component {
             return;
         }
 
+        setTimeout(() => this.cacheData(), 0);
+    }
+
+    cacheData() {
         this.state.loadingText = "문자열 자료 읽어들이는 중...";
-        this.setState(this.state, this.cacheData);
-    }
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.setState(this.state, async () => {
+            const data = this.context.files["0a0000"];
+            const dataKeys = Object.keys(data);
 
-    async cacheData() {
-        const data = this.context.files["0a0000"];
-        const dataKeys = Object.keys(data);
+            for (let [i, dataKey] of dataKeys.entries()) {
+                await ReadBytesFromFile(data[dataKey]).then(b => {
+                    data[dataKey + "-cache"] = b;
 
-        for (let dataKey of dataKeys) {
-            await ReadBytesFromFile(data[dataKey]).then(b => {
-                data[dataKey + "-cache"] = b;
-            });
-        }
-
-        this.state.loadingText = "문자열 자료 매핑 중...";
-        this.setState(this.state, this.constructDataMap);
-    }
-
-    async constructDataMap() {
-        const dv = new DataView(this.context.files["0a0000"]["index-cache"]);
-        const headerOffset = dv.getInt32(0xc, true);
-        const fileOffset = dv.getInt32(headerOffset + 0x8, true);
-        const fileCount = dv.getInt32(headerOffset + 0xc, true) / 0x10;
-
-        for (let i = 0; i < fileCount; i++) {
-            const curFileOffset = fileOffset + i * 0x10;
-            const key = dv.getUint32(curFileOffset, true);
-            const directoryKey = dv.getUint32(curFileOffset + 0x4, true);
-            const wrappedOffset = dv.getUint32(curFileOffset + 0x8, true);
-            const unwrappedOffset = UnwrapOffset(wrappedOffset);
-
-            if (!this.state.dataMap[directoryKey]) {
-                this.state.dataMap[directoryKey] = {};
+                    return new Promise(resolve => {
+                        let newProgress = Math.round(((i + 1) / dataKeys.length) * 100);
+                        if (newProgress > this.state.loadingProgress) {
+                            this.state.loadingSubText = dataKey.toString();
+                            this.state.loadingProgress = newProgress;
+                            this.setState(this.state, () => setTimeout(resolve, 1000));
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
             }
 
-            this.state.dataMap[directoryKey][key] = {
-                key: key,
-                directoryKey: directoryKey,
-                datFileNum: unwrappedOffset.datFileNum,
-                datOffset: unwrappedOffset.datOffset
-            };
-        }
+            setTimeout(() => this.constructDataMap(), 1000);
+        });
+    }
 
-        this.state.loadingText = "문자열 자료 ExL 디코딩 중...";
-        this.setState(this.state, this.decodeExL);
+    constructDataMap() {
+        this.state.loadingText = "문자열 자료 매핑 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.state.loadingStepProgress = Math.round((1 / 7) * 100);
+        this.setState(this.state, async () => {
+            const dv = new DataView(this.context.files["0a0000"]["index-cache"]);
+            const headerOffset = dv.getInt32(0xc, true);
+            const fileOffset = dv.getInt32(headerOffset + 0x8, true);
+            const fileCount = dv.getInt32(headerOffset + 0xc, true) / 0x10;
+
+            for (let i = 0; i < fileCount; i++) {
+                const curFileOffset = fileOffset + i * 0x10;
+                const key = dv.getUint32(curFileOffset, true);
+                const directoryKey = dv.getUint32(curFileOffset + 0x4, true);
+                const unwrappedOffset = UnwrapOffset(
+                    dv.getUint32(curFileOffset + 0x8, true)
+                );
+
+                if (!this.state.dataMap[directoryKey]) {
+                    this.state.dataMap[directoryKey] = {};
+                }
+
+                this.state.dataMap[directoryKey][key] = {
+                    key: key,
+                    directoryKey: directoryKey,
+                    datFileNum: unwrappedOffset.datFileNum,
+                    datOffset: unwrappedOffset.datOffset
+                };
+
+                await new Promise(resolve => {
+                    let newProgress = Math.round(((i + 1) / fileCount) * 100);
+                    if (newProgress > this.state.loadingProgress) {
+                        this.state.loadingSubText = key;
+                        this.state.loadingProgress = newProgress;
+                        this.setState(this.state, () => setTimeout(resolve, 10));
+                    } else {
+                        resolve();
+                    }
+                });
+            }
+
+            setTimeout(() => this.decodeExL(), 1000);
+        });
     }
 
     decodeExL() {
-        const rootExL = this.state.dataMap[Compute("exd")][Compute("root.exl")];
-        if (!rootExL) {
-            this.state.errors.push(
-                "문자열 자료 인덱스에서 ExL을 찾을 수 없습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
+        this.state.loadingText = "문자열 자료 ExL 디코딩 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.state.loadingStepProgress = Math.round((2 / 7) * 100);
+        this.setState(this.state, async () => {
+            const rootExL = this.state.dataMap[Compute("exd")][Compute("root.exl")];
+            if (!rootExL) {
+                this.state.errors.push(
+                    "문자열 자료 인덱스에서 ExL을 찾을 수 없습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
+                );
+                this.state.loading = false;
+                this.setState(this.state);
+                return;
+            }
+
+            rootExL.name = "root.exl";
+            rootExL.directoryName = "exd";
+
+            const data = DecodeDataBlocks(
+                this.context.files["0a0000"][rootExL.datFileNum + "-cache"],
+                rootExL.datOffset
             );
-            this.state.loading = false;
-            this.setState(this.state);
-            return;
-        }
+            const lines = [];
+            const rootLines = new TextDecoder().decode(data).split("\n");
 
-        rootExL.name = "root.exl";
-        rootExL.directoryName = "exd";
+            for (let [i, rootLine] of rootLines.entries()) {
+                const rootLineCols = rootLine.split(",");
+                if (rootLineCols.length !== 2) continue;
+                lines.push(rootLineCols[0]);
 
-        const data = DecodeDataBlocks(
-            this.context.files["0a0000"][rootExL.datFileNum + "-cache"],
-            rootExL.datOffset
-        );
-        const lines = [];
-        const rootLines = new TextDecoder().decode(data).split("\n");
+                await new Promise(resolve => {
+                    let newProgress = Math.round(((i + 1) / rootLines.length) * 100);
+                    if (newProgress > this.state.loadingProgress) {
+                        this.state.loadingSubText = rootLineCols[0];
+                        this.state.loadingProgress = newProgress;
+                        this.setState(this.state, () => setTimeout(resolve, 10));
+                    } else {
+                        resolve();
+                    }
+                });
+            }
 
-        for (let rootLine of rootLines) {
-            const rootLineCols = rootLine.split(",");
-            if (rootLineCols.length !== 2) continue;
-            lines.push(rootLineCols[0]);
-        }
+            if (lines.length === 0) {
+                this.state.errors.push(
+                    "ExL 디코딩에 실패했습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
+                );
+                this.state.loading = false;
+                this.setState(this.state);
+                return;
+            }
 
-        if (lines.length === 0) {
-            this.state.errors.push(
-                "ExL 디코딩에 실패했습니다. 선택한 자료가 올바른 자료인지 확인해주세요."
-            );
-            this.state.loading = false;
-            this.setState(this.state);
-            return;
-        }
-
-        this.state.loadingText = "문자열 자료 ExH 등록 중...";
-        this.setState(this.state, () => this.buildTreeNode(lines));
+            setTimeout(() => this.buildTreeNode(lines), 1000);
+        });
     }
 
     buildTreeNode(lines) {
-        for (let line of lines) {
-            const name =
-                line.indexOf("/") !== -1
-                    ? line.substring(line.lastIndexOf("/") + 1, line.length)
-                    : line;
-            const directoryName =
-                line.indexOf("/") !== -1
-                    ? "exd/" + line.substring(0, line.lastIndexOf("/"))
-                    : "exd";
+        this.state.loadingText = "문자열 자료 ExH 등록 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.state.loadingStepProgress = Math.round((3 / 7) * 100);
+        this.setState(this.state, async () => {
+            for (let [i, line] of lines.entries()) {
+                const name =
+                    line.indexOf("/") !== -1
+                        ? line.substring(line.lastIndexOf("/") + 1, line.length)
+                        : line;
+                const directoryName =
+                    line.indexOf("/") !== -1
+                        ? "exd/" + line.substring(0, line.lastIndexOf("/"))
+                        : "exd";
+                if (!this.state.dataMap[Compute(directoryName)]) continue;
 
-            if (!this.state.dataMap[Compute(directoryName)]) continue;
-            if (!this.state.dataMap[Compute(directoryName)][Compute(name + ".exh")])
-                continue;
+                const exHData = this.state.dataMap[Compute(directoryName)][
+                    Compute(name + ".exh")
+                    ];
+                if (!exHData) continue;
+                if (!this.context.files["0a0000"][exHData.datFileNum]) continue;
 
-            const exHData = this.state.dataMap[Compute(directoryName)][
-                Compute(name + ".exh")
-                ];
-            if (!this.context.files["0a0000"][exHData.datFileNum]) continue;
+                const directories = directoryName.split("/");
+                let node = this.state.dataTree;
+                for (let directory of directories) {
+                    if (node.children.findIndex(n => n.title === directory) === -1) {
+                        node.children.push({
+                            key: node.key + "-" + directory,
+                            value: directory,
+                            title: directory,
+                            children: [],
+                            selectable: false
+                        });
+                    }
 
-            const directories = directoryName.split("/");
+                    node = node.children.find(n => n.title === directory);
+                }
+                node.children.push({
+                    key: node.key + "-" + name,
+                    value: name,
+                    title: name,
+                    children: [],
+                    selectable: true,
+                    exH: {
+                        name: name,
+                        directoryName: directoryName,
+                        data: exHData
+                    }
+                });
 
-            let node = this.state.dataTree;
-            let parentKey = this.state.dataTree.key;
+                await new Promise(resolve => {
+                    let newProgress = Math.round(((i + 1) / lines.length) * 100);
+                    if (newProgress > this.state.loadingProgress) {
+                        this.state.loadingSubText = name;
+                        this.state.loadingProgress = newProgress;
+                        this.setState(this.state, () => setTimeout(resolve, 10));
+                    } else {
+                        resolve();
+                    }
+                });
+            }
 
-            for (let directory of directories) {
-                if (node.directories.findIndex(v => v.name === directory) === -1) {
-                    node.directories.push({
-                        key: parentKey + "-" + directory,
-                        name: directory,
-                        directories: [],
-                        files: []
-                    });
+            setTimeout(() => this.decodeExH(), 1000);
+        });
+    }
+
+    decodeExH() {
+        this.state.loadingText = "문자열 자료 ExH 디코딩 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.state.loadingStepProgress = Math.round((4 / 7) * 100);
+        this.setState(this.state, async () => {
+            const exHs = this.retrieveNodes(this.state.dataTree).map(n => n.exH);
+            for (let [i, exH] of exHs.entries()) {
+                const data = DecodeDataBlocks(
+                    this.context.files["0a0000"][exH.data.datFileNum + "-cache"],
+                    exH.data.datOffset
+                );
+                const decodedExH = DecodeExH(data);
+                if (
+                    decodedExH.variant === 1 &&
+                    decodedExH.ranges.length > 0 &&
+                    decodedExH.languages.length > 0
+                ) {
+                    exH.decoded = decodedExH;
                 }
 
-                node = node.directories.find(v => v.name === directory);
-                parentKey = node.key;
+                await new Promise(resolve => {
+                    let newProgress = Math.round(((i + 1) / exHs.length) * 100);
+                    if (newProgress > this.state.loadingProgress) {
+                        this.state.loadingSubText = exH.name;
+                        this.state.loadingProgress = newProgress;
+                        this.setState(this.state, () => setTimeout(resolve, 10));
+                    } else {
+                        resolve();
+                    }
+                });
             }
 
-            node.files.push({
-                key: parentKey + "-" + name,
-                name: name,
-                directoryName: directoryName,
-                exHData: exHData
-            });
-        }
-
-        this.state.loadingText = "문자열 자료 ExH 디코딩 중...";
-        this.setState(this.state, this.decodeExH);
+            setTimeout(() => this.decodeExD(), 1000);
+        });
     }
 
-    async decodeExH() {
-        const exHs = this.retrieveFiles(this.state.dataTree);
-        for (let exH of exHs) {
-            const data = DecodeDataBlocks(
-                this.context.files["0a0000"][exH.exHData.datFileNum + "-cache"],
-                exH.exHData.datOffset
-            );
-            const decodedExH = DecodeExH(data);
-            if (
-                decodedExH.variant === 1 &&
-                decodedExH.ranges.length > 0 &&
-                decodedExH.languages.length > 0
-            ) {
-                exH.decodedExH = decodedExH;
+    retrieveNodes(node) {
+        const nodes = node.children.filter(c => c.selectable);
+
+        const remainingNodes = node.children.filter(c => !c.selectable);
+        for (let remainingNode of remainingNodes) {
+            const childNodes = this.retrieveNodes(remainingNode);
+            for (let childNode of childNodes) {
+                nodes.push(childNode);
             }
         }
 
-        this.state.loadingText = "문자열 자료 ExD 디코딩 중...";
-        this.setState(this.state, this.decodeExD);
-    }
-
-    retrieveFiles(node) {
-        const files = [];
-        for (let file of node.files) {
-            files.push(file);
-        }
-
-        for (let directory of node.directories) {
-            const directoryFiles = this.retrieveFiles(directory);
-            for (let directoryFile of directoryFiles) {
-                files.push(directoryFile);
-            }
-        }
-
-        return files;
+        return nodes;
     }
 
     decodeExD() {
-        const exHs = this.retrieveFiles(this.state.dataTree);
-        for (let exH of exHs) {
-            if (!exH.decodedExH) continue;
+        this.state.loadingText = "문자열 자료 ExD 디코딩 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 0;
+        this.state.loadingStepProgress = Math.round((5 / 7) * 100);
+        this.setState(this.state, async () => {
+            const nodes = this.retrieveNodes(this.state.dataTree);
+            for (let [i, node] of nodes.entries()) {
+                if (!node.exH.decoded) continue;
 
-            const tableColumns = [];
-            for (let column of exH.decodedExH.columns) {
-                if (column.type === 0x0) {
+                const tableColumns = [];
+                for (let column of node.exH.decoded.columns) {
+                    if (column.type !== 0x0) continue;
                     tableColumns.push({
                         title: column.offset,
                         key: column.offset,
@@ -229,61 +315,120 @@ class EditorSecond extends React.Component {
                                 : "NULL"
                     });
                 }
-            }
-            if (tableColumns.length === 0) continue;
-            exH.tableColumns = tableColumns;
+                if (tableColumns.length === 0) continue;
+                node.exD = {
+                    tableColumns: tableColumns
+                };
 
-            for (let range of exH.decodedExH.ranges) {
-                for (let lang of exH.decodedExH.languages) {
-                    const exDName =
-                        exH.name + "_" + range.start + "_" + lang.code + ".exd";
-                    if (!this.state.dataMap[Compute(exH.directoryName)]) continue;
-                    if (!this.state.dataMap[Compute(exH.directoryName)][Compute(exDName)])
-                        continue;
+                for (let range of node.exH.decoded.ranges) {
+                    for (let lang of node.exH.decoded.languages) {
+                        const exDName =
+                            node.exH.name + "_" + range.start + "_" + lang.code + ".exd";
+                        if (!this.state.dataMap[Compute(node.exH.directoryName)]) continue;
 
-                    const exDData = this.state.dataMap[Compute(exH.directoryName)][
-                        Compute(exDName)
-                        ];
-                    const data = DecodeDataBlocks(
-                        this.context.files["0a0000"][exDData.datFileNum + "-cache"],
-                        exDData.datOffset
-                    );
+                        const exDData = this.state.dataMap[Compute(node.exH.directoryName)][
+                            Compute(exDName)
+                            ];
+                        if (!exDData) continue;
 
-                    const tableDataSource = DecodeExD(
-                        data,
-                        tableColumns,
-                        exH.decodedExH.fixedSizeDataLength
-                    );
+                        const data = DecodeDataBlocks(
+                            this.context.files["0a0000"][exDData.datFileNum + "-cache"],
+                            exDData.datOffset
+                        );
+                        const tableDataSource = DecodeExD(
+                            data,
+                            tableColumns,
+                            node.exH.decoded.fixedSizeDataLength
+                        );
+                        node.exD[exDName] = {
+                            data: exDData,
+                            tableDataSource: tableDataSource
+                        };
 
-                    exH[exDName] = {
-                        data: exDData,
-                        tableDataSource: tableDataSource
-                    };
-                    range.loaded = true;
-                    lang.loaded = true;
+                        range.loaded = true;
+                        lang.loaded = true;
+                    }
                 }
-            }
-        }
 
-        this.state.loadingText = "문자열 자료 트리 정리 중...";
-        this.setState(this.state, this.cleanUpTree);
+                await new Promise(resolve => {
+                    let newProgress = Math.round(((i + 1) / nodes.length) * 100);
+                    if (newProgress > this.state.loadingProgress) {
+                        this.state.loadingSubText = node.exH.name;
+                        this.state.loadingProgress = newProgress;
+                        this.setState(this.state, () => setTimeout(resolve, 100));
+                    } else {
+                        resolve();
+                    }
+                });
+            }
+
+            setTimeout(() => this.cleanUpTree(), 1000);
+        });
     }
 
     cleanUpTree() {
-        this.cleanUpNode(this.state.dataTree);
-        console.log(this.state.dataTree);
+        this.state.loadingText = "문자열 자료 트리 정리 중...";
+        this.state.loadingSubText = "";
+        this.state.loadingProgress = 100;
+        this.state.loadingStepProgress = Math.round((6 / 7) * 100);
+        this.setState(this.state, () => {
+            this.cleanUpNode(this.state.dataTree);
+
+            this.state.loading = false;
+            this.setState(this.state);
+
+            console.log(this.state.dataTree);
+        });
     }
 
     cleanUpNode(node) {
-        let index = node.files.findIndex(f => !f.decodedExH);
-        while (index !== -1) {
-            node.files.splice(index, 1);
-            index = node.files.findIndex(f => !f.decodedExH);
+        const children = node.children.filter(
+            n =>
+                n.selectable &&
+                n.exH &&
+                n.exH.decoded &&
+                n.exH.decoded.ranges &&
+                n.exH.decoded.languages
+        );
+        for (let child of children) {
+            while (true) {
+                let range = child.exH.decoded.ranges.findIndex(r => !r.loaded);
+                if (range === -1) break;
+                child.exH.decoded.ranges.splice(range, 1);
+            }
+
+            while (true) {
+                let lang = child.exH.decoded.languages.findIndex(l => !l.loaded);
+                if (lang === -1) break;
+                child.exH.decoded.languages.splice(lang, 1);
+            }
         }
 
-        for (let directory of node.directories) {
-            this.cleanUpNode(directory);
+        while (true) {
+            let index = node.children.findIndex(
+                n =>
+                    n.selectable &&
+                    (!n.exH ||
+                        !n.exH.decoded ||
+                        !n.exH.decoded.ranges ||
+                        n.exH.decoded.ranges.length === 0 ||
+                        !n.exH.decoded.languages ||
+                        n.exH.decoded.languages.length === 0 ||
+                        !n.exD ||
+                        !n.exD.tableColumns ||
+                        n.exD.tableColumns.length === 0)
+            );
+            if (index === -1) break;
+            node.children.splice(index, 1);
         }
+
+        const remainingNodes = node.children.filter(n => !n.selectable);
+        for (let remainingNode of remainingNodes) {
+            this.cleanUpNode(remainingNode);
+        }
+    }
+
+    renderEditor(dataTree) {
     }
 
     render() {
@@ -295,33 +440,56 @@ class EditorSecond extends React.Component {
                     <Steps.Step title="자료 재구축"/>
                 </Steps>
                 {this.state.errors.length > 0 && (
-                    <div style={{marginTop: "25px"}}>
-                        <Alert
-                            description={
-                                <ul>
-                                    {this.state.errors.map((e, i) => {
-                                        return <li key={i}>{e}</li>;
-                                    })}
-                                </ul>
-                            }
-                            message="오류"
-                            showIcon
-                            type="error"
-                        />
-                    </div>
+                    <React.Fragment>
+                        <div style={{marginTop: "25px"}}>
+                            <Alert
+                                description={
+                                    <ul>
+                                        {this.state.errors.map((e, i) => {
+                                            return <li key={i}>{e}</li>;
+                                        })}
+                                    </ul>
+                                }
+                                message="오류"
+                                showIcon
+                                type="error"
+                            />
+                        </div>
+                        <div style={{marginTop: "25px"}}>
+                            <Button
+                                block
+                                onClick={() => Router.push("/editor/1")}
+                                type="danger"
+                            >
+                                <Icon type="left"/>
+                                이전 단계로
+                            </Button>
+                        </div>
+                    </React.Fragment>
                 )}
                 {this.state.loading && (
                     <div style={{marginTop: "25px"}}>
                         <Result
-                            icon={<Icon type="loading"/>}
-                            title="트리 생성 중..."
-                            subTitle={this.state.loadingText}
+                            icon={
+                                <React.Fragment>
+                                    <Progress
+                                        percent={this.state.loadingProgress}
+                                        type="circle"
+                                    />
+                                    <Progress
+                                        percent={this.state.loadingStepProgress}
+                                        style={{marginTop: "25px"}}
+                                    />
+                                </React.Fragment>
+                            }
+                            title={this.state.loadingText}
+                            subTitle={this.state.loadingSubText}
                         />
                     </div>
                 )}
-                {!this.state.loading && (
+                {!this.state.loading && this.state.errors.length === 0 && (
                     <div style={{marginTop: "25px"}}>
-                        {/*this.renderEditor(this.state)*/}
+                        {this.renderEditor(this.state.dataTree)}
                     </div>
                 )}
             </Card>
