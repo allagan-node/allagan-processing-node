@@ -6,6 +6,7 @@ import {
   Progress,
   Result,
   Steps,
+  Table,
   Tabs,
   TreeSelect
 } from "antd";
@@ -483,12 +484,7 @@ class EditorSecond extends React.Component {
       exD: node.props.exD,
       exH: node.props.exH
     };
-    console.log(this.state.selectedNode);
     this.setState(this.state);
-  }
-
-  onLanguageChange(activeKey) {
-    console.log(activeKey);
   }
 
   render() {
@@ -561,13 +557,44 @@ class EditorSecond extends React.Component {
             {this.state.selectedNode.exD && this.state.selectedNode.exH && (
               <div style={{ marginTop: "25px" }}>
                 <Tabs
-                  onChange={activeKey => this.onLanguageChange(activeKey)}
-                  tabPosition="top"
+                  style={{ maxHeight: "calc(100vh - 200px)" }}
+                  tabPosition="left"
                 >
-                  {this.state.selectedNode.exH.decoded.languages.map(l => {
+                  {this.state.selectedNode.exH.decoded.ranges.map(r => {
                     return (
-                      <Tabs.TabPane key={l.code} tab={l.code}>
-                        Hello, World!
+                      <Tabs.TabPane
+                        key={r.start}
+                        style={{
+                          maxHeight: "calc(100vh - 200px)",
+                          overflow: "auto"
+                        }}
+                        tab={r.start}
+                      >
+                        <Tabs tabPosition="top">
+                          {this.state.selectedNode.exH.decoded.languages.map(
+                            l => {
+                              return (
+                                <Tabs.TabPane key={l.code} tab={l.code}>
+                                  <Table
+                                    columns={
+                                      this.state.selectedNode.exD.tableColumns
+                                    }
+                                    dataSource={
+                                      this.state.selectedNode.exD[
+                                        this.state.selectedNode.exH.name +
+                                          "_" +
+                                          r.start +
+                                          "_" +
+                                          l.code +
+                                          ".exd"
+                                      ].tableDataSource
+                                    }
+                                  />
+                                </Tabs.TabPane>
+                              );
+                            }
+                          )}
+                        </Tabs>
                       </Tabs.TabPane>
                     );
                   })}
