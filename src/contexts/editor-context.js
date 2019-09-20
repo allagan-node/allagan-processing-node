@@ -1,9 +1,8 @@
 import React from "react";
 
 const EditorContext = React.createContext({
-    files: {},
-    setFiles: () => {
-    }
+  files: {},
+  setFiles: () => {}
 });
 
 export default EditorContext;
