@@ -557,19 +557,12 @@ class EditorSecond extends React.Component {
             {this.state.selectedNode.exD && this.state.selectedNode.exH && (
               <div style={{ marginTop: "25px" }}>
                 <Tabs
-                  style={{ maxHeight: "calc(100vh - 200px)" }}
+                  style={{ height: "calc(100vh - 275px)" }}
                   tabPosition="left"
                 >
                   {this.state.selectedNode.exH.decoded.ranges.map(r => {
                     return (
-                      <Tabs.TabPane
-                        key={r.start}
-                        style={{
-                          maxHeight: "calc(100vh - 200px)",
-                          overflow: "auto"
-                        }}
-                        tab={r.start}
-                      >
+                      <Tabs.TabPane key={r.start} tab={r.start}>
                         <Tabs tabPosition="top">
                           {this.state.selectedNode.exH.decoded.languages.map(
                             l => {
@@ -589,6 +582,11 @@ class EditorSecond extends React.Component {
                                           ".exd"
                                       ].tableDataSource
                                     }
+                                    scroll={{
+                                      x: true,
+                                      y: "calc(100vh - 425px)"
+                                    }}
+                                    size="small"
                                   />
                                 </Tabs.TabPane>
                               );
