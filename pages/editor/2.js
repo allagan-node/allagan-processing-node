@@ -12,6 +12,7 @@ import {
 } from "antd";
 import Router from "next/router";
 import React from "react";
+import { Resizable } from "react-resizable";
 
 import EditorContext from "../../src/contexts/editor-context";
 import {
@@ -344,6 +345,7 @@ class EditorSecond extends React.Component {
             });
           }
           if (tableColumns.length === 0) continue;
+
           node.exD = {
             tableColumns: tableColumns
           };
@@ -490,6 +492,11 @@ class EditorSecond extends React.Component {
   render() {
     return (
       <Card style={{ margin: "25px" }}>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: "table th, table td { white-space: nowrap; }"
+          }}
+        />
         <Steps current={1}>
           <Steps.Step title="편집할 자료 선택" />
           <Steps.Step title="편집" />
@@ -569,6 +576,7 @@ class EditorSecond extends React.Component {
                               return (
                                 <Tabs.TabPane key={l.code} tab={l.code}>
                                   <Table
+                                    bordered={true}
                                     columns={
                                       this.state.selectedNode.exD.tableColumns
                                     }
@@ -586,6 +594,7 @@ class EditorSecond extends React.Component {
                                       x: true,
                                       y: "calc(100vh - 425px)"
                                     }}
+                                    showHeader={false}
                                     size="small"
                                   />
                                 </Tabs.TabPane>
