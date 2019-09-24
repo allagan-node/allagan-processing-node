@@ -12,7 +12,6 @@ import {
 } from "antd";
 import Router from "next/router";
 import React from "react";
-import { Resizable } from "react-resizable";
 
 import EditorContext from "../../src/contexts/editor-context";
 import {
@@ -170,6 +169,8 @@ class EditorSecond extends React.Component {
         for (let [i, rootLine] of rootLines.entries()) {
           const rootLineCols = rootLine.split(",");
           if (rootLineCols.length !== 2) continue;
+          if (rootLineCols[0] !== "Achievement" && rootLineCols[0] !== "Quest")
+            continue;
           lines.push(rootLineCols[0]);
 
           await new Promise(resolve => {
@@ -338,10 +339,17 @@ class EditorSecond extends React.Component {
               title: column.offset,
               key: column.offset,
               dataIndex: column.offset,
+              onCell: (record, rowIndex) => {
+                return {
+                  record: record,
+                  columnOffset: column.offset,
+                  rowIndex: rowIndex
+                };
+              },
               render: b =>
                 b && b.length > 0
                   ? new TextDecoder().decode(new Uint8Array(b).buffer)
-                  : "NULL"
+                  : ""
             });
           }
           if (tableColumns.length === 0) continue;
@@ -580,6 +588,11 @@ class EditorSecond extends React.Component {
                                     columns={
                                       this.state.selectedNode.exD.tableColumns
                                     }
+                                    components={{
+                                      body: {
+                                        cell: EditableCell
+                                      }
+                                    }}
                                     dataSource={
                                       this.state.selectedNode.exD[
                                         this.state.selectedNode.exH.name +
@@ -595,7 +608,7 @@ class EditorSecond extends React.Component {
                                       y: "calc(100vh - 425px)"
                                     }}
                                     showHeader={false}
-                                    size="small"
+                                    size="middle"
                                   />
                                 </Tabs.TabPane>
                               );
@@ -612,6 +625,31 @@ class EditorSecond extends React.Component {
         )}
       </Card>
     );
+  }
+}
+
+class EditableCell extends React.Component {
+  constructor(props) {
+    super(props);
+
+    this.state = {
+      children: props.children,
+      editable: props.record[props.columnOffset].length > 0
+    };
+  }
+
+  render() {
+    if (this.state.editable) {
+      return (
+        <td onClick={() => console.log("test!")}>{this.state.children}</td>
+      );
+    } else {
+      return (
+        <td style={{ backgroundColor: "#eee", height: "46px" }}>
+          {this.state.children}
+        </td>
+      );
+    }
   }
 }
 
