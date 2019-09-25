@@ -44,7 +44,9 @@ class EditorSecond extends React.Component {
         children: [],
         selectable: false
       },
-      selectedNode: {}
+      selectedNode: {},
+      activeRangeStart: "",
+      activeLangCode: ""
     };
   }
 
@@ -343,7 +345,19 @@ class EditorSecond extends React.Component {
                 return {
                   record: record,
                   columnOffset: column.offset,
-                  rowIndex: rowIndex
+                  rowIndex: rowIndex,
+                  test: () => {
+                    const dataSource = this.state.selectedNode.exD[
+                      this.state.selectedNode.exH.name +
+                        "_" +
+                        this.state.activeRangeStart +
+                        "_" +
+                        this.state.activeLangCode +
+                        ".exd"
+                    ].tableDataSource;
+                    console.log(dataSource[rowIndex][column.offset]);
+                    console.log(record);
+                  }
                 };
               },
               render: b =>
@@ -494,6 +508,8 @@ class EditorSecond extends React.Component {
       exD: node.props.exD,
       exH: node.props.exH
     };
+    this.state.activeRangeStart = node.props.exH.decoded.ranges[0].start.toString();
+    this.state.activeLangCode = node.props.exH.decoded.languages[0].code.toString();
     this.setState(this.state);
   }
 
@@ -572,13 +588,25 @@ class EditorSecond extends React.Component {
             {this.state.selectedNode.exD && this.state.selectedNode.exH && (
               <div style={{ marginTop: "25px" }}>
                 <Tabs
+                  activeKey={this.state.activeRangeStart}
+                  onChange={activeKey => {
+                    this.state.activeRangeStart = activeKey;
+                    this.setState(this.state);
+                  }}
                   style={{ height: "calc(100vh - 275px)" }}
                   tabPosition="left"
                 >
                   {this.state.selectedNode.exH.decoded.ranges.map(r => {
                     return (
                       <Tabs.TabPane key={r.start} tab={r.start}>
-                        <Tabs tabPosition="top">
+                        <Tabs
+                          activeKey={this.state.activeLangCode}
+                          onChange={activeKey => {
+                            this.state.activeLangCode = activeKey;
+                            this.setState(this.state);
+                          }}
+                          tabPosition="top"
+                        >
                           {this.state.selectedNode.exH.decoded.languages.map(
                             l => {
                               return (
@@ -634,14 +662,23 @@ class EditableCell extends React.Component {
 
     this.state = {
       children: props.children,
-      editable: props.record[props.columnOffset].length > 0
+      editable: props.record[props.columnOffset].length > 0,
+      columnOffset: props.columnOffset,
+      record: props.record,
+      test: props.test
     };
   }
 
   render() {
     if (this.state.editable) {
       return (
-        <td onClick={() => console.log("test!")}>{this.state.children}</td>
+        <td
+          onClick={() => {
+            this.state.test();
+          }}
+        >
+          {this.state.children}
+        </td>
       );
     } else {
       return (
