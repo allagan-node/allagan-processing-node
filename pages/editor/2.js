@@ -347,16 +347,28 @@ class EditorSecond extends React.Component {
                   columnOffset: column.offset,
                   rowIndex: rowIndex,
                   test: () => {
-                    const dataSource = this.state.selectedNode.exD[
+                    const exDName =
                       this.state.selectedNode.exH.name +
-                        "_" +
-                        this.state.activeRangeStart +
-                        "_" +
-                        this.state.activeLangCode +
-                        ".exd"
-                    ].tableDataSource;
-                    console.log(dataSource[rowIndex][column.offset]);
-                    console.log(record);
+                      "_" +
+                      this.state.activeRangeStart +
+                      "_" +
+                      this.state.activeLangCode +
+                      ".exd";
+                    const dataSource = this.state.selectedNode.exD[exDName]
+                      .tableDataSource;
+                    this.state.selectedNode.exD[exDName].tableDataSource = [];
+                    this.setState(this.state, () =>
+                      setTimeout(() => {
+                        const curRow = dataSource.find(
+                          r => r.key === record.key
+                        );
+                        curRow[column.offset] = new Uint8Array();
+                        this.state.selectedNode.exD[
+                          exDName
+                        ].tableDataSource = dataSource;
+                        this.setState(this.state);
+                      }, 1000)
+                    );
                   }
                 };
               },
