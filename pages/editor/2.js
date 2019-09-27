@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Icon,
+  Input,
   Progress,
   Result,
   Steps,
@@ -19,6 +20,8 @@ import {
   DecodeDataBlocks,
   DecodeExD,
   DecodeExH,
+  DecodeString,
+  EncodeString,
   ReadBytesFromFile,
   UnwrapOffset
 } from "../../src/utility";
@@ -346,36 +349,34 @@ class EditorSecond extends React.Component {
                   record: record,
                   columnOffset: column.offset,
                   rowIndex: rowIndex,
-                  test: () => {
-                    const exDName =
+                  edit: value => {
+                    const curExD = this.state.selectedNode.exD[
                       this.state.selectedNode.exH.name +
-                      "_" +
-                      this.state.activeRangeStart +
-                      "_" +
-                      this.state.activeLangCode +
-                      ".exd";
-                    const dataSource = this.state.selectedNode.exD[exDName]
-                      .tableDataSource;
-                    this.state.selectedNode.exD[exDName].tableDataSource = [];
+                        "_" +
+                        this.state.activeRangeStart +
+                        "_" +
+                        this.state.activeLangCode +
+                        ".exd"
+                    ];
+                    const dataSource = curExD.tableDataSource;
+
+                    curExD.loading = true;
+                    curExD.tableDataSource = [];
+
                     this.setState(this.state, () =>
                       setTimeout(() => {
-                        const curRow = dataSource.find(
-                          r => r.key === record.key
-                        );
-                        curRow[column.offset] = new Uint8Array();
-                        this.state.selectedNode.exD[
-                          exDName
-                        ].tableDataSource = dataSource;
+                        dataSource.find(r => r.key === record.key)[
+                          column.offset
+                        ] = EncodeString(value);
+                        curExD.tableDataSource = dataSource;
+                        curExD.loading = false;
                         this.setState(this.state);
-                      }, 1000)
+                      }, 500)
                     );
                   }
                 };
               },
-              render: b =>
-                b && b.length > 0
-                  ? new TextDecoder().decode(new Uint8Array(b).buffer)
-                  : ""
+              render: b => (b && b.length > 0 ? DecodeString(b) : "")
             });
           }
           if (tableColumns.length === 0) continue;
@@ -407,6 +408,7 @@ class EditorSecond extends React.Component {
               );
               node.exD[exDName] = {
                 data: exDData,
+                loading: false,
                 tableDataSource: tableDataSource
               };
 
@@ -621,6 +623,15 @@ class EditorSecond extends React.Component {
                         >
                           {this.state.selectedNode.exH.decoded.languages.map(
                             l => {
+                              const selectedExD = this.state.selectedNode.exD[
+                                this.state.selectedNode.exH.name +
+                                  "_" +
+                                  r.start +
+                                  "_" +
+                                  l.code +
+                                  ".exd"
+                              ];
+
                               return (
                                 <Tabs.TabPane key={l.code} tab={l.code}>
                                   <Table
@@ -633,16 +644,8 @@ class EditorSecond extends React.Component {
                                         cell: EditableCell
                                       }
                                     }}
-                                    dataSource={
-                                      this.state.selectedNode.exD[
-                                        this.state.selectedNode.exH.name +
-                                          "_" +
-                                          r.start +
-                                          "_" +
-                                          l.code +
-                                          ".exd"
-                                      ].tableDataSource
-                                    }
+                                    dataSource={selectedExD.tableDataSource}
+                                    loading={selectedExD.loading}
                                     scroll={{
                                       x: true,
                                       y: "calc(100vh - 425px)"
@@ -674,19 +677,55 @@ class EditableCell extends React.Component {
 
     this.state = {
       children: props.children,
-      editable: props.record[props.columnOffset].length > 0,
       columnOffset: props.columnOffset,
-      record: props.record,
-      test: props.test
+      edit: props.edit,
+      editable: props.record[props.columnOffset].length > 0,
+      editing: false,
+      inputValue: DecodeString(props.record[props.columnOffset]),
+      record: props.record
     };
   }
 
+  handleChange(e) {
+    this.state.inputValue = e.target.value;
+    this.setState(this.state);
+  }
+
+  save() {
+    this.state.editing = false;
+    this.setState(this.state, () =>
+      setTimeout(() => {
+        this.state.edit(this.state.inputValue);
+      }, 500)
+    );
+  }
+
   render() {
-    if (this.state.editable) {
+    if (this.state.editing) {
+      return (
+        <td
+          style={{
+            margin: "50px 50px 50px 50px",
+            minHeight: "100px",
+            minWidth: "500px",
+            wordBreak: "break-all",
+            wordWrap: "break-word"
+          }}
+        >
+          <Input
+            onBlur={() => this.save()}
+            onChange={e => this.handleChange(e)}
+            onPressEnter={() => this.save()}
+            value={this.state.inputValue}
+          />
+        </td>
+      );
+    } else if (this.state.editable) {
       return (
         <td
           onClick={() => {
-            this.state.test();
+            this.state.editing = true;
+            this.setState(this.state);
           }}
         >
           {this.state.children}

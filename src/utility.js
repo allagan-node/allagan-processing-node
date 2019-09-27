@@ -415,6 +415,14 @@ export const DecodeExH = data => {
   return exh;
 };
 
+export const DecodeString = value => {
+  return new TextDecoder().decode(value.buffer);
+};
+
+export const EncodeString = value => {
+  return new Uint8Array();
+};
+
 export const GetBytes = str => {
   const bytes = [];
   for (let i = 0; i < str.length; i++) {
