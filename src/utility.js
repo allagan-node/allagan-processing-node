@@ -420,7 +420,7 @@ export const DecodeString = value => {
 };
 
 export const EncodeString = value => {
-  return new Uint8Array();
+  return new TextEncoder().encode(value);
 };
 
 export const GetBytes = str => {

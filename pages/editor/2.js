@@ -4,11 +4,13 @@ import {
   Card,
   Icon,
   Input,
+  Modal,
   Progress,
   Result,
   Steps,
   Table,
   Tabs,
+  Tree,
   TreeSelect
 } from "antd";
 import Router from "next/router";
@@ -174,8 +176,6 @@ class EditorSecond extends React.Component {
         for (let [i, rootLine] of rootLines.entries()) {
           const rootLineCols = rootLine.split(",");
           if (rootLineCols.length !== 2) continue;
-          if (rootLineCols[0] !== "Achievement" && rootLineCols[0] !== "Quest")
-            continue;
           lines.push(rootLineCols[0]);
 
           await new Promise(resolve => {
@@ -268,7 +268,25 @@ class EditorSecond extends React.Component {
           });
         }
 
-        setTimeout(() => this.decodeExH(), 1000);
+        let checkedKeys = [];
+
+        Modal.info({
+          content: (
+            <Tree
+              checkable={true}
+              onCheck={_checkedKeys => {
+                checkedKeys = _checkedKeys;
+              }}
+              treeData={[this.state.dataTree]}
+            />
+          ),
+          onOk: () => {
+            console.log(checkedKeys);
+            setTimeout(() => this.decodeExH(), 1000);
+          },
+          title: "디코딩할 자료들을 선택하세요.",
+          width: "50vw"
+        });
       }, 1000)
     );
   }
@@ -680,60 +698,53 @@ class EditableCell extends React.Component {
       columnOffset: props.columnOffset,
       edit: props.edit,
       editable: props.record[props.columnOffset].length > 0,
-      editing: false,
-      inputValue: DecodeString(props.record[props.columnOffset]),
       record: props.record
     };
   }
 
-  handleChange(e) {
-    this.state.inputValue = e.target.value;
-    this.setState(this.state);
-  }
+  onClick() {
+    let value = DecodeString(this.state.record[this.state.columnOffset]);
 
-  save() {
-    this.state.editing = false;
-    this.setState(this.state, () =>
-      setTimeout(() => {
-        this.state.edit(this.state.inputValue);
-      }, 500)
-    );
+    Modal.info({
+      content: (
+        <Input.TextArea
+          defaultValue={DecodeString(
+            this.state.record[this.state.columnOffset]
+          )}
+          onChange={e => {
+            value = e.target.value;
+          }}
+          rows={4}
+        />
+      ),
+      maskClosable: true,
+      onCancel: () => {},
+      onOk: () => {
+        if (value && value.length > 0) {
+          this.state.edit(value);
+        }
+      },
+      title: "문자열 편집",
+      width: "50vw"
+    });
   }
 
   render() {
-    if (this.state.editing) {
+    if (this.state.editable) {
       return (
-        <td
-          style={{
-            margin: "50px 50px 50px 50px",
-            minHeight: "100px",
-            minWidth: "500px",
-            wordBreak: "break-all",
-            wordWrap: "break-word"
-          }}
-        >
-          <Input
-            onBlur={() => this.save()}
-            onChange={e => this.handleChange(e)}
-            onPressEnter={() => this.save()}
-            value={this.state.inputValue}
-          />
-        </td>
-      );
-    } else if (this.state.editable) {
-      return (
-        <td
-          onClick={() => {
-            this.state.editing = true;
-            this.setState(this.state);
-          }}
-        >
+        <td onClick={() => this.onClick()} style={{ cursor: "pointer" }}>
           {this.state.children}
         </td>
       );
     } else {
       return (
-        <td style={{ backgroundColor: "#eee", height: "46px" }}>
+        <td
+          style={{
+            backgroundColor: "#eee",
+            cursor: "not-allowed",
+            height: "46px"
+          }}
+        >
           {this.state.children}
         </td>
       );
