@@ -10,3 +10,8 @@ This node is used to provide human-friendly interface to process, edit and build
 1. `npm install`
 2. `npm run develop` for local development.
 3. `npm build` for production build.
+
+## Environments
+
+* Production environment: https://allagan-node.now.sh/
+* Development environment: https://allagan-processing-node-git-dev.allagan-node.now.sh/
