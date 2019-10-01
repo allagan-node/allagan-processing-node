@@ -17,7 +17,16 @@ class Index extends React.Component {
         />
         <Row justify="center" style={{ marginTop: "25px" }} type="flex">
           <Col span={8}>
-            <Card hoverable onClick={() => Router.push("/editor/1")}>
+            <Card
+              hoverable
+              onClick={() => {
+                if (window) {
+                  window.location = "/editor";
+                } else {
+                  Router.push("/editor");
+                }
+              }}
+            >
               <Card.Meta
                 avatar={<Avatar icon="edit" />}
                 description="편집 도구를 사용해 자료 편집이 가능합니다."

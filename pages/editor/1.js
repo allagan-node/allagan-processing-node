@@ -29,6 +29,11 @@ class EditorFirst extends React.Component {
     };
   }
 
+  componentDidMount() {
+    this.context.setFiles({});
+    this.context.setDataTree({});
+  }
+
   validateFileList(file, fileList) {
     if (!fileList || fileList.length === 0) return;
     if (fileList[fileList.length - 1].uid !== file.uid) return;
@@ -238,7 +243,7 @@ class EditorFirst extends React.Component {
             block
             disabled={!this.state.pass}
             loading={this.state.loading}
-            onClick={() => Router.push("/editor/2")}
+            onClick={() => Router.replace("/editor/2", "/editor")}
             type="primary"
           >
             다음 단계로

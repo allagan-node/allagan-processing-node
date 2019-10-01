@@ -51,12 +51,20 @@ class EditorSecond extends React.Component {
       },
       selectedNode: {},
       activeRangeStart: "",
-      activeLangCode: ""
+      activeLangCode: "",
+      enableSaveButton: false
     };
   }
 
   componentDidMount() {
-    if (!this.context.files.loaded) Router.push("/editor/1");
+    if (!this.context.files.loaded) {
+      if (window) {
+        window.location = "/editor";
+      } else {
+        Router.replace("/editor");
+      }
+    }
+
     if (!this.context.files["0a0000"] || !this.context.files["0a0000"].index) {
       this.state.errors.push(
         "트리 생성에 필요한 문자열 자료 파일을 찾을 수 없습니다. 자료를 다시 선택해주세요."
@@ -268,7 +276,13 @@ class EditorSecond extends React.Component {
           });
         }
 
+        this.orderNode(this.state.dataTree);
+
         let checkedKeys = [];
+        const onClosingTree = () => {
+          this.filterNode(this.state.dataTree, checkedKeys);
+          setTimeout(() => this.decodeExH(), 1000);
+        };
 
         Modal.info({
           content: (
@@ -280,14 +294,41 @@ class EditorSecond extends React.Component {
               treeData={[this.state.dataTree]}
             />
           ),
-          onOk: () => {
-            console.log(checkedKeys);
-            setTimeout(() => this.decodeExH(), 1000);
-          },
+          maskClosable: true,
+          onCancel: () => onClosingTree(),
+          onOk: () => onClosingTree(),
           title: "디코딩할 자료들을 선택하세요.",
           width: "50vw"
         });
       }, 1000)
+    );
+  }
+
+  orderNode(node) {
+    node.children
+      .sort((firstEl, secondEl) => {
+        return firstEl - secondEl;
+      })
+      .sort((firstEl, secondEl) => {
+        return (firstEl.selectable ? 1 : 0) - (secondEl.selectable ? 1 : 0);
+      });
+
+    const remainingNodes = node.children.filter(n => !n.selectable);
+    for (let remainingNode of remainingNodes) {
+      this.orderNode(remainingNode);
+    }
+  }
+
+  filterNode(node, targets) {
+    const remainingNodes = node.children.filter(n => !n.selectable);
+    for (let remainingNode of remainingNodes) {
+      this.filterNode(remainingNode, targets);
+    }
+
+    node.children = node.children.filter(
+      n =>
+        (!n.selectable && n.children.length > 0) ||
+        (n.selectable && targets.indexOf(n.key) !== -1)
     );
   }
 
@@ -388,6 +429,7 @@ class EditorSecond extends React.Component {
                         ] = EncodeString(value);
                         curExD.tableDataSource = dataSource;
                         curExD.loading = false;
+                        this.state.enableSaveButton = true;
                         this.setState(this.state);
                       }, 500)
                     );
@@ -460,6 +502,7 @@ class EditorSecond extends React.Component {
     this.setState(this.state, () =>
       setTimeout(() => {
         this.cleanUpNode(this.state.dataTree);
+        this.orderNode(this.state.dataTree);
 
         const data = this.context.files["0a0000"];
         const dataKeys = Object.keys(data);
@@ -521,14 +564,6 @@ class EditorSecond extends React.Component {
       node.children.splice(index, 1);
     }
 
-    node.children
-      .sort((firstEl, secondEl) => {
-        return firstEl - secondEl;
-      })
-      .sort((firstEl, secondEl) => {
-        return (firstEl.selectable ? 1 : 0) - (secondEl.selectable ? 1 : 0);
-      });
-
     const remainingNodes = node.children.filter(n => !n.selectable);
     for (let remainingNode of remainingNodes) {
       this.cleanUpNode(remainingNode);
@@ -536,13 +571,24 @@ class EditorSecond extends React.Component {
   }
 
   onTreeSelect(value, node) {
-    this.state.selectedNode = {
-      exD: node.props.exD,
-      exH: node.props.exH
-    };
-    this.state.activeRangeStart = node.props.exH.decoded.ranges[0].start.toString();
-    this.state.activeLangCode = node.props.exH.decoded.languages[0].code.toString();
-    this.setState(this.state);
+    this.state.selectedNode = {};
+    this.setState(this.state, () =>
+      setTimeout(() => {
+        this.state.selectedNode = {
+          exD: node.props.exD,
+          exH: node.props.exH
+        };
+        this.state.activeRangeStart = node.props.exH.decoded.ranges[0].start.toString();
+        this.state.activeLangCode = node.props.exH.decoded.languages[0].code.toString();
+        this.setState(this.state);
+      }, 500)
+    );
+  }
+
+  save() {
+    this.state.dataTree.loaded = true;
+    this.context.setDataTree(this.state.dataTree);
+    Router.replace("/editor/3", "/editor");
   }
 
   render() {
@@ -554,7 +600,7 @@ class EditorSecond extends React.Component {
           }}
         />
         <Steps current={1}>
-          <Steps.Step title="편집할 자료 선택" />
+          <Steps.Step title={<a href="/editor">편집할 자료 선택</a>} />
           <Steps.Step title="편집" />
           <Steps.Step title="자료 재구축" />
         </Steps>
@@ -577,7 +623,13 @@ class EditorSecond extends React.Component {
             <div style={{ marginTop: "25px" }}>
               <Button
                 block
-                onClick={() => Router.push("/editor/1")}
+                onClick={() => {
+                  if (window) {
+                    window.location = "/editor";
+                  } else {
+                    Router.push("/editor");
+                  }
+                }}
                 type="danger"
               >
                 <Icon type="left" />
@@ -616,6 +668,15 @@ class EditorSecond extends React.Component {
                 style={{ minWidth: "300px" }}
                 treeData={[this.state.dataTree]}
               />
+              <Button
+                disabled={!this.state.enableSaveButton}
+                icon="download"
+                onClick={() => this.save()}
+                style={{ marginLeft: "25px" }}
+                type="primary"
+              >
+                자료 재구축
+              </Button>
             </div>
             {this.state.selectedNode.exD && this.state.selectedNode.exH && (
               <div style={{ marginTop: "25px" }}>

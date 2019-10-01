@@ -54,7 +54,16 @@ class TopHeader extends React.Component {
           <Menu.Item key="/" onClick={() => Router.push("/")}>
             알라그 가공 시스템
           </Menu.Item>
-          <Menu.Item key="/editor" onClick={() => Router.push("/editor/1")}>
+          <Menu.Item
+            key="/editor"
+            onClick={() => {
+              if (window) {
+                window.location = "/editor";
+              } else {
+                Router.push("/editor");
+              }
+            }}
+          >
             <Icon type="edit" />
             편집 도구
           </Menu.Item>

@@ -15,9 +15,16 @@ class AllaganProcessingNode extends App {
       this.setState(this.state);
     };
 
+    this.setDataTree = dataTree => {
+      this.state.dataTree = dataTree;
+      this.setState(this.state);
+    };
+
     this.state = {
       files: {},
-      setFiles: this.setFiles
+      setFiles: this.setFiles,
+      dataTree: {},
+      setDataTree: this.setDataTree
     };
   }
 
