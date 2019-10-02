@@ -81,29 +81,31 @@ class EditorSecond extends React.Component {
     this.state.loadingText = "문자열 자료 읽어들이는 중...";
     this.state.loadingSubText = "";
     this.state.loadingProgress = 0;
-    this.setState(this.state, async () => {
-      const data = this.context.files["0a0000"];
-      const dataKeys = Object.keys(data);
+    this.setState(this.state, () =>
+      setTimeout(async () => {
+        const data = this.context.files["0a0000"];
+        const dataKeys = Object.keys(data);
 
-      for (let [i, dataKey] of dataKeys.entries()) {
-        await ReadBytesFromFile(data[dataKey]).then(b => {
-          data[dataKey + "-cache"] = b;
+        for (let [i, dataKey] of dataKeys.entries()) {
+          await ReadBytesFromFile(data[dataKey]).then(b => {
+            data[dataKey + "-cache"] = b;
 
-          return new Promise(resolve => {
-            let newProgress = Math.round(((i + 1) / dataKeys.length) * 100);
-            if (newProgress > this.state.loadingProgress) {
-              this.state.loadingSubText = dataKey.toString();
-              this.state.loadingProgress = newProgress;
-              this.setState(this.state, () => setTimeout(resolve, 1000));
-            } else {
-              resolve();
-            }
+            return new Promise(resolve => {
+              let newProgress = Math.round(((i + 1) / dataKeys.length) * 100);
+              if (newProgress > this.state.loadingProgress) {
+                this.state.loadingSubText = dataKey.toString();
+                this.state.loadingProgress = newProgress;
+                this.setState(this.state, () => setTimeout(resolve, 1000));
+              } else {
+                resolve();
+              }
+            });
           });
-        });
-      }
+        }
 
-      setTimeout(() => this.constructDataMap(), 1000);
-    });
+        setTimeout(() => this.constructDataMap(), 1000);
+      }, 1000)
+    );
   }
 
   constructDataMap() {
@@ -424,12 +426,16 @@ class EditorSecond extends React.Component {
 
                     this.setState(this.state, () =>
                       setTimeout(() => {
-                        dataSource.find(r => r.key === record.key)[
-                          column.offset
-                        ] = EncodeString(value);
+                        const targetRow = dataSource.find(
+                          r => r.key === record.key
+                        );
+                        if (DecodeString(targetRow[column.offset]) !== value) {
+                          targetRow[column.offset] = EncodeString(value);
+                          curExD.touched = true;
+                          this.state.enableSaveButton = true;
+                        }
                         curExD.tableDataSource = dataSource;
                         curExD.loading = false;
-                        this.state.enableSaveButton = true;
                         this.setState(this.state);
                       }, 500)
                     );
@@ -469,7 +475,8 @@ class EditorSecond extends React.Component {
               node.exD[exDName] = {
                 data: exDData,
                 loading: false,
-                tableDataSource: tableDataSource
+                tableDataSource: tableDataSource,
+                touched: false
               };
 
               range.loaded = true;
