@@ -29,7 +29,11 @@ class EditorThird extends React.Component {
       }
     }
 
-    if (!this.context.files["0a0000"] || !this.context.files["0a0000"].index) {
+    if (
+      !this.context.files["0a0000"] ||
+      !this.context.files["0a0000"].index ||
+      !this.context.files["0a0000"]["0"]
+    ) {
       this.state.errors.push(
         "문자열 자료 파일을 찾을 수 없습니다. 자료를 다시 선택해주세요."
       );
@@ -61,8 +65,9 @@ class EditorThird extends React.Component {
           });
         }
 
-        data["new-index-cache"] = [];
-        data["new-dat-cache"] = [];
+        const dv = new DataView(data["0-cache"].slice(0, 0x800));
+        dv.setInt32(0x400 + 0x10, 0x2, true);
+        data["new-dat-cache"] = dv.buffer;
 
         setTimeout(() => this.process(), 0);
       }, 1000)
