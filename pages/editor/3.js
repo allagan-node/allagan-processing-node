@@ -21,7 +21,9 @@ class EditorThird extends React.Component {
       loading: true,
       loadingText: "",
       loadingSubText: "",
-      loadingProgress: 0
+      loadingProgress: 0,
+      downloadUrl: "",
+      downloadUrlTwo: ""
     };
   }
 
@@ -70,9 +72,11 @@ class EditorThird extends React.Component {
           });
         }
 
-        const dv = new DataView(data["0-cache"].slice(0, 0x800));
+        const datHeader = new Uint8Array(data["0-cache"].slice(0, 0x800));
+        const dv = new DataView(datHeader.buffer);
         dv.setInt32(0x400 + 0x10, 0x2, true);
-        data["new-dat-cache"] = dv.buffer;
+        data["new-dat-cache"] = [];
+        data["new-dat-cache"].push(...datHeader);
 
         setTimeout(() => this.process(), 0);
       }, 1000)
@@ -132,6 +136,13 @@ class EditorThird extends React.Component {
               ],
               unwrappedOffset.datOffset
             );
+
+            this.state.downloadUrlTwo = URL.createObjectURL(
+              new Blob([origData], {
+                type: "application/octet-stream"
+              })
+            );
+
             const origDv = new DataView(origData.buffer);
 
             const origOffsetTableSize = origDv.getInt32(0x8, false);
@@ -145,7 +156,7 @@ class EditorThird extends React.Component {
               0x20 + origOffsetTableSize,
               0x20 + origOffsetTableSize + origChunkTableSize
             );
-            const newChunkTable = new Uint8Array();
+            const newChunkTable = [];
 
             for (let i = 0; i < origOffsetTableSize; i += 0x8) {
               const origOffsetDv = new DataView(origOffsetTable.buffer);
@@ -170,17 +181,106 @@ class EditorThird extends React.Component {
               const newChunks = [];
 
               for (let colOffset of Object.keys(touchedRow).filter(
-                k => k !== "key"
+                k => !isNaN(parseInt(k, 10))
               )) {
                 columnDefinitionsDv.setUint32(
-                  parseInt(colOffset),
+                  parseInt(colOffset, 10),
                   newChunks.length,
                   false
                 );
                 newChunks.push(...touchedRow[colOffset]);
                 newChunks.push(0);
               }
+
+              const paddingLeftover =
+                (newChunks.length +
+                  touchedNode.exH.decoded.fixedSizeDataLength +
+                  0x6 +
+                  newChunkTable.length +
+                  origOffsetTableSize +
+                  0x20) %
+                0x4;
+              if (paddingLeftover !== 0) {
+                for (let i = 0; i < 0x4 - paddingLeftover; i++) {
+                  newChunks.push(0);
+                }
+              }
+
+              const newChunkHeader = new Uint8Array(0x6);
+              const newChunkHeaderDv = new DataView(newChunkHeader.buffer);
+              newChunkHeaderDv.setUint32(
+                0x0,
+                newChunks.length + touchedNode.exH.decoded.fixedSizeDataLength,
+                false
+              );
+              newChunkHeaderDv.setUint16(0x4, touchedRow.checkDigit, false);
+
+              origOffsetDv.setUint32(
+                i + 0x4,
+                newChunkTable.length + 0x20 + origOffsetTableSize,
+                false
+              );
+
+              newChunkTable.push(...newChunkHeader);
+              newChunkTable.push(...columnDefinitions);
+              newChunkTable.push(...newChunks);
             }
+
+            const newData = [];
+
+            const origHeader = origData.slice(0, 0x20);
+
+            for (let b of origHeader) {
+              newData.push(b);
+            }
+
+            for (let b of origOffsetTable) {
+              newData.push(b);
+            }
+
+            for (let b of newChunkTable) {
+              newData.push(b);
+            }
+
+            const newDataArray = new Uint8Array(newData);
+            const newDataArrayDv = new DataView(newDataArray.buffer);
+            newDataArrayDv.setUint32(0xc, newChunkTable.length, false);
+
+            // WriteData
+            const blocks = [];
+            let pos = 0;
+            while (pos < newDataArray.length) {
+              const blockLength = Math.min(0x3e80, newDataArray.length - pos);
+              const block = [];
+              const slicedData = newDataArray.slice(pos, pos + blockLength);
+              block.push(...slicedData);
+              blocks.push(block);
+            }
+
+            let newHeaderLength = 0x18 + blocks.length * 0x8;
+            const newHeaderPaddingLeftover = newHeaderLength % 0x80;
+            if (newHeaderPaddingLeftover !== 0) {
+              newHeaderLength += 0x80 - newHeaderPaddingLeftover;
+            }
+
+            const newHeaderArray = new Uint8Array(newHeaderLength);
+            const oldHeaderFront = this.context.files["0a0000"][
+              unwrappedOffset.datFileNum + "-cache"
+            ].slice(
+              unwrappedOffset.datOffset,
+              unwrappedOffset.datOffset + 0x18
+            );
+            for (let i = 0; i < 0x18; i++) {
+              newHeaderArray[i] = oldHeaderFront[i];
+            }
+
+            this.state.loading = false;
+            this.state.downloadUrl = URL.createObjectURL(
+              new Blob([newDataArray], {
+                type: "application/octet-stream"
+              })
+            );
+            this.setState(this.state);
           } else if (unwrappedOffset.datOffset === 1) {
             // Push it in dat1 and update index
           } else {
@@ -262,6 +362,23 @@ class EditorThird extends React.Component {
               title={this.state.loadingText}
               subTitle={this.state.loadingSubText}
             />
+          </div>
+        )}
+        {!this.state.loading && (
+          <div style={{ marginTop: "25px" }}>
+            <Button block href={this.state.downloadUrl} type="primary">
+              <Icon type="download" />
+              다운로드
+            </Button>
+            <Button
+              block
+              href={this.state.downloadUrlTwo}
+              style={{ marginTop: "25px" }}
+              type="primary"
+            >
+              <Icon type="download" />
+              다운로드
+            </Button>
           </div>
         )}
       </Card>

@@ -344,7 +344,8 @@ export const DecodeExD = (data, tableColumns, fixedSizeDataLength) => {
       chunkSize - fixedSizeDataLength
     );
     const row = {
-      key: key
+      key: key,
+      checkDigit: chunkCheckDigit
     };
 
     for (let column of tableColumns) {
