@@ -3,7 +3,12 @@ import Router from "next/router";
 import React from "react";
 
 import EditorContext from "../../src/contexts/editor-context";
-import { Compute, ReadBytesFromFile, UnwrapOffset } from "../../src/utility";
+import {
+  Compute,
+  DecodeDataBlocks,
+  ReadBytesFromFile,
+  UnwrapOffset
+} from "../../src/utility";
 
 class EditorThird extends React.Component {
   static contextType = EditorContext;
@@ -112,8 +117,70 @@ class EditorThird extends React.Component {
               Object.keys(n.exD).findIndex(k => Compute(k) === key) !== -1 &&
               Compute(n.exH.directoryName) === directoryKey
           );
+
           if (touchedNode) {
-            // Re-compile modified data and put it in dat1
+            console.log(touchedNode);
+
+            const touchedExD =
+              touchedNode.exD[
+                Object.keys(touchedNode.exD).find(k => Compute(k) === key)
+              ];
+
+            const origData = DecodeDataBlocks(
+              this.context.files["0a0000"][
+                unwrappedOffset.datFileNum + "-cache"
+              ],
+              unwrappedOffset.datOffset
+            );
+            const origDv = new DataView(origData.buffer);
+
+            const origOffsetTableSize = origDv.getInt32(0x8, false);
+            const origChunkTableSize = origDv.getInt32(0xc, false);
+
+            const origOffsetTable = origData.slice(
+              0x20,
+              0x20 + origOffsetTableSize
+            );
+            const origChunkTable = origData.slice(
+              0x20 + origOffsetTableSize,
+              0x20 + origOffsetTableSize + origChunkTableSize
+            );
+            const newChunkTable = new Uint8Array();
+
+            for (let i = 0; i < origOffsetTableSize; i += 0x8) {
+              const origOffsetDv = new DataView(origOffsetTable.buffer);
+              const origChunkKey = origOffsetDv.getInt32(i, false);
+              const origChunkOffset = origOffsetDv.getInt32(i + 0x4, false);
+
+              const origChunkStartPosition =
+                origChunkOffset - 0x20 - origOffsetTableSize;
+              const columnDefinitions = origChunkTable.slice(
+                origChunkStartPosition + 0x6,
+                origChunkStartPosition +
+                  0x6 +
+                  touchedNode.exH.decoded.fixedSizeDataLength
+              );
+              const columnDefinitionsDv = new DataView(
+                columnDefinitions.buffer
+              );
+
+              const touchedRow = touchedExD.tableDataSource.find(
+                r => r.key === origChunkKey
+              );
+              const newChunks = [];
+
+              for (let colOffset of Object.keys(touchedRow).filter(
+                k => k !== "key"
+              )) {
+                columnDefinitionsDv.setUint32(
+                  parseInt(colOffset),
+                  newChunks.length,
+                  false
+                );
+                newChunks.push(...touchedRow[colOffset]);
+                newChunks.push(0);
+              }
+            }
           } else if (unwrappedOffset.datOffset === 1) {
             // Push it in dat1 and update index
           } else {
